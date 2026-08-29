@@ -105,6 +105,25 @@ class SalesOrderAPITests(APITestCase):
         order.refresh_from_db()
         self.assertEqual(order.total_amount, Decimal("50.00"))
 
+    def test_item_mutations_increment_order_version(self):
+        order = self.create_order()
+        self.authenticate()
+        initial = order.version
+        item_id = self.add_item(order).data["id"]
+        order.refresh_from_db(); self.assertEqual(order.version, initial + 1)
+        self.client.patch(f"{self.list_url}{order.id}/items/{item_id}/", {"quantity": "3"}, format="json")
+        order.refresh_from_db(); self.assertEqual(order.version, initial + 2)
+        self.client.delete(f"{self.list_url}{order.id}/items/{item_id}/")
+        order.refresh_from_db(); self.assertEqual(order.version, initial + 3)
+
+    def test_notes_change_increments_version_but_status_change_does_not(self):
+        order = self.create_order()
+        self.authenticate()
+        self.client.patch(f"{self.list_url}{order.id}/", {"notes": "اصلاح سفارش"}, format="json")
+        order.refresh_from_db(); self.assertEqual(order.version, 2)
+        self.client.patch(f"{self.list_url}{order.id}/", {"status": "confirmed"}, format="json")
+        order.refresh_from_db(); self.assertEqual(order.version, 2)
+
     def test_unauthenticated_access_rejected(self):
         self.assertEqual(self.client.get(self.list_url).status_code, status.HTTP_401_UNAUTHORIZED)
 

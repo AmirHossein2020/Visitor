@@ -48,6 +48,22 @@ export async function apiRequest(path, options = {}, allowRefresh = true) {
   return data;
 }
 
+export async function apiBlob(path, allowRefresh = true) {
+  const access = localStorage.getItem(ACCESS_KEY);
+  const headers = access ? { Authorization: "Bearer " + access } : {};
+  const response = await fetch("/api" + path, { headers });
+  if (response.status === 401 && allowRefresh && localStorage.getItem(REFRESH_KEY)) {
+    const newAccess = await refreshAccessToken();
+    if (newAccess) return apiBlob(path, false);
+  }
+  if (!response.ok) {
+    const error = new Error("دریافت فایل انجام نشد.");
+    error.status = response.status;
+    throw error;
+  }
+  return response.blob();
+}
+
 export function getErrorMessage(error) {
   const data = error?.data;
   if (!data) return "ارتباط با سرور برقرار نشد. دوباره تلاش کنید.";

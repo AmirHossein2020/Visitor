@@ -25,15 +25,41 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SalesOrder
-        fields = ("id", "customer", "customer_name", "status", "status_display", "total_amount", "created_at", "updated_at")
-        read_only_fields = ("id", "customer_name", "status_display", "total_amount", "created_at", "updated_at")
+        fields = ("id", "customer", "customer_name", "status", "status_display", "total_amount", "version", "created_at", "updated_at")
+        read_only_fields = ("id", "customer_name", "status_display", "total_amount", "version", "created_at", "updated_at")
 
 
 class SalesOrderSerializer(SalesOrderListSerializer):
     items = SalesOrderItemSerializer(many=True, read_only=True)
+    active_invoice = serializers.SerializerMethodField()
+    invoice_needs_revision = serializers.SerializerMethodField()
 
     class Meta(SalesOrderListSerializer.Meta):
-        fields = SalesOrderListSerializer.Meta.fields + ("notes", "items")
+        fields = SalesOrderListSerializer.Meta.fields + ("notes", "items", "active_invoice", "invoice_needs_revision")
+
+    def _active_invoice(self, obj):
+        if not hasattr(self, "_invoice_cache"):
+            self._invoice_cache = {}
+        if obj.pk not in self._invoice_cache:
+            self._invoice_cache[obj.pk] = obj.invoices.filter(status="issued").only(
+                "id", "invoice_number", "source_order_version", "revision_number"
+            ).first()
+        return self._invoice_cache[obj.pk]
+
+    def get_active_invoice(self, obj):
+        invoice = self._active_invoice(obj)
+        if not invoice:
+            return None
+        return {
+            "id": invoice.id,
+            "invoice_number": invoice.invoice_number,
+            "revision_number": invoice.revision_number,
+            "source_order_version": invoice.source_order_version,
+        }
+
+    def get_invoice_needs_revision(self, obj):
+        invoice = self._active_invoice(obj)
+        return bool(invoice and obj.version > invoice.source_order_version)
 
     def validate_customer(self, customer):
         request = self.context["request"]

@@ -27,6 +27,7 @@ class SalesOrder(models.Model):
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
     notes = models.TextField(blank=True)
     total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -37,13 +38,17 @@ class SalesOrder(models.Model):
             models.Index(fields=("owner", "status")),
         ]
 
-    def recalculate_total(self):
+    def recalculate_total(self, *, increment_version=False):
         total = sum(
             self.items.values_list("line_total", flat=True),
             start=Decimal("0.00"),
         )
         self.total_amount = total.quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
-        self.save(update_fields=("total_amount", "updated_at"))
+        update_fields = ["total_amount", "updated_at"]
+        if increment_version:
+            self.version += 1
+            update_fields.append("version")
+        self.save(update_fields=update_fields)
 
     def __str__(self):
         return f"{self.customer} - {self.pk}"

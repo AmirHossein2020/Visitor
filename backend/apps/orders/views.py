@@ -31,6 +31,17 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    def perform_update(self, serializer):
+        order = serializer.instance
+        meaningful_fields = {"customer", "notes"}
+        changed = any(
+            field in serializer.validated_data
+            and getattr(order, f"{field}_id" if field == "customer" else field)
+            != (serializer.validated_data[field].id if field == "customer" else serializer.validated_data[field])
+            for field in meaningful_fields
+        )
+        serializer.save(version=order.version + 1 if changed else order.version)
+
     def destroy(self, request, *args, **kwargs):
         order = self.get_object()
         order.status = SalesOrder.Status.CANCELLED
@@ -63,7 +74,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                     product.default_price,
                 ),
             )
-            order.recalculate_total()
+            order.recalculate_total(increment_version=True)
         return Response(SalesOrderItemSerializer(item).data, status=status.HTTP_201_CREATED)
 
     @action(
@@ -81,13 +92,18 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             item = get_object_or_404(SalesOrderItem, pk=item_id, order=order)
             if request.method == "DELETE":
                 item.delete()
-                order.recalculate_total()
+                order.recalculate_total(increment_version=True)
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
             input_serializer = UpdateOrderItemSerializer(data=request.data)
             input_serializer.is_valid(raise_exception=True)
+            changed = any(
+                getattr(item, field) != value
+                for field, value in input_serializer.validated_data.items()
+            )
             for field, value in input_serializer.validated_data.items():
                 setattr(item, field, value)
-            item.save()
-            order.recalculate_total()
+            if changed:
+                item.save()
+                order.recalculate_total(increment_version=True)
         return Response(SalesOrderItemSerializer(item).data)
