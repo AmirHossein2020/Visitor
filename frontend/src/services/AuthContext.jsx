@@ -12,8 +12,8 @@ export function AuthProvider({ children }) {
       const currentUser = await apiRequest("/auth/me/");
       setUser(currentUser);
       return currentUser;
-    } catch {
-      clearTokens();
+    } catch (error) {
+      if (error?.status === 401) clearTokens();
       setUser(null);
       return null;
     }

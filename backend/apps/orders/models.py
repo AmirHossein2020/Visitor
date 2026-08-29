@@ -90,3 +90,72 @@ class SalesOrderItem(models.Model):
 
     def __str__(self):
         return self.product_name_snapshot
+
+
+class SalesReturn(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "پیش‌نویس"
+        CONFIRMED = "confirmed", "تأییدشده"
+        CANCELLED = "cancelled", "لغوشده"
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sales_returns"
+    )
+    invoice = models.ForeignKey(
+        "invoices.Invoice", on_delete=models.PROTECT, related_name="sales_returns"
+    )
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    notes = models.TextField(blank=True)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("owner", "created_at")),
+            models.Index(fields=("invoice", "status")),
+        ]
+
+    def recalculate_total(self):
+        total = sum(self.items.values_list("line_total", flat=True), start=Decimal("0.00"))
+        self.total_amount = total.quantize(MONEY_PLACES, rounding=ROUND_HALF_UP)
+        self.save(update_fields=("total_amount", "updated_at"))
+
+    def __str__(self):
+        return f"{self.invoice.invoice_number} - {self.pk}"
+
+
+class SalesReturnItem(models.Model):
+    sales_return = models.ForeignKey(SalesReturn, on_delete=models.CASCADE, related_name="items")
+    invoice_item = models.ForeignKey(
+        "invoices.InvoiceItem", on_delete=models.PROTECT, related_name="sales_return_items"
+    )
+    product_name_snapshot = models.CharField(max_length=200)
+    brand_snapshot = models.CharField(max_length=120, blank=True)
+    unit_snapshot = models.CharField(max_length=50)
+    quantity = models.DecimalField(
+        max_digits=12, decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    unit_price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
+    line_total = models.DecimalField(max_digits=18, decimal_places=2, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("sales_return", "invoice_item"), name="unique_invoice_item_per_sales_return"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.line_total = (self.quantity * self.unit_price).quantize(
+            MONEY_PLACES, rounding=ROUND_HALF_UP
+        )
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.product_name_snapshot

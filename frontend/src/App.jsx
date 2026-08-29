@@ -1,31 +1,38 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { navigate, useRoute } from "./hooks/useRoute";
-import HomePage from "./pages/HomePage";
-import InvoiceCreatePage from "./pages/InvoiceCreatePage";
-import InvoiceDetailPage from "./pages/InvoiceDetailPage";
-import InvoiceListPage from "./pages/InvoiceListPage";
-import CompanyCreatePage from "./pages/CompanyCreatePage";
-import CompanyDetailPage from "./pages/CompanyDetailPage";
-import CompanyEditPage from "./pages/CompanyEditPage";
-import CompanyListPage from "./pages/CompanyListPage";
-import CustomerCreatePage from "./pages/CustomerCreatePage";
-import CustomerDetailPage from "./pages/CustomerDetailPage";
-import CustomerEditPage from "./pages/CustomerEditPage";
-import CustomerListPage from "./pages/CustomerListPage";
-import LoginPage from "./pages/LoginPage";
-import OrderCreatePage from "./pages/OrderCreatePage";
-import OrderDetailPage from "./pages/OrderDetailPage";
-import OrderListPage from "./pages/OrderListPage";
-import ProductCreatePage from "./pages/ProductCreatePage";
-import ProductEditPage from "./pages/ProductEditPage";
-import ProductListPage from "./pages/ProductListPage";
-import PurchaseCreatePage from "./pages/PurchaseCreatePage";
-import PurchaseDetailPage from "./pages/PurchaseDetailPage";
-import PurchaseListPage from "./pages/PurchaseListPage";
-import RegisterPage from "./pages/RegisterPage";
 import { useAuth } from "./services/AuthContext";
 
-function App() {
+const HomePage = lazy(() => import("./pages/HomePage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const CustomerListPage = lazy(() => import("./pages/CustomerListPage"));
+const CustomerCreatePage = lazy(() => import("./pages/CustomerCreatePage"));
+const CustomerDetailPage = lazy(() => import("./pages/CustomerDetailPage"));
+const CustomerEditPage = lazy(() => import("./pages/CustomerEditPage"));
+const ProductListPage = lazy(() => import("./pages/ProductListPage"));
+const ProductCreatePage = lazy(() => import("./pages/ProductCreatePage"));
+const ProductEditPage = lazy(() => import("./pages/ProductEditPage"));
+const OrderListPage = lazy(() => import("./pages/OrderListPage"));
+const OrderCreatePage = lazy(() => import("./pages/OrderCreatePage"));
+const OrderDetailPage = lazy(() => import("./pages/OrderDetailPage"));
+const PurchaseListPage = lazy(() => import("./pages/PurchaseListPage"));
+const PurchaseCreatePage = lazy(() => import("./pages/PurchaseCreatePage"));
+const PurchaseDetailPage = lazy(() => import("./pages/PurchaseDetailPage"));
+const InvoiceListPage = lazy(() => import("./pages/InvoiceListPage"));
+const InvoiceCreatePage = lazy(() => import("./pages/InvoiceCreatePage"));
+const InvoiceDetailPage = lazy(() => import("./pages/InvoiceDetailPage"));
+const ReturnListPage = lazy(() => import("./pages/ReturnListPage"));
+const ReturnCreatePage = lazy(() => import("./pages/ReturnCreatePage"));
+const ReturnDetailPage = lazy(() => import("./pages/ReturnDetailPage"));
+const InventoryListPage = lazy(() => import("./pages/InventoryListPage"));
+const InventoryDetailPage = lazy(() => import("./pages/InventoryDetailPage"));
+const CompanyListPage = lazy(() => import("./pages/CompanyListPage"));
+const CompanyCreatePage = lazy(() => import("./pages/CompanyCreatePage"));
+const CompanyDetailPage = lazy(() => import("./pages/CompanyDetailPage"));
+const CompanyEditPage = lazy(() => import("./pages/CompanyEditPage"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage"));
+
+function AppRoutes() {
   const path = useRoute();
   const { user, isLoading } = useAuth();
 
@@ -39,6 +46,15 @@ function App() {
   if (path === "/register" && !user) return <RegisterPage />;
   if (path === "/login" && !user) return <LoginPage />;
   if (user && path === "/invoices") return <InvoiceListPage />;
+  if (user && path === "/reports") return <ReportsPage />;
+  if (user && path === "/inventory") return <InventoryListPage />;
+  const inventoryDetailMatch = path.match(/^\/inventory\/(\d+)$/);
+  if (user && inventoryDetailMatch) return <InventoryDetailPage productId={inventoryDetailMatch[1]} />;
+  if (user && path === "/returns") return <ReturnListPage />;
+  const returnCreateMatch = path.match(/^\/invoices\/(\d+)\/returns\/new$/);
+  if (user && returnCreateMatch) return <ReturnCreatePage invoiceId={returnCreateMatch[1]} />;
+  const returnDetailMatch = path.match(/^\/returns\/(\d+)$/);
+  if (user && returnDetailMatch) return <ReturnDetailPage returnId={returnDetailMatch[1]} />;
   const invoiceCreateMatch = path.match(/^\/orders\/(\d+)\/invoice\/new$/);
   if (user && invoiceCreateMatch) return <InvoiceCreatePage orderId={invoiceCreateMatch[1]} />;
   const invoiceDetailMatch = path.match(/^\/invoices\/(\d+)$/);
@@ -71,6 +87,10 @@ function App() {
   if (user && editMatch) return <ProductEditPage productId={editMatch[1]} />;
   if (user) return <HomePage />;
   return null;
+}
+
+function App() {
+  return <Suspense fallback={<main className="flex min-h-dvh items-center justify-center bg-slate-50 text-slate-600">در حال بارگذاری…</main>}><AppRoutes /></Suspense>;
 }
 
 export default App;

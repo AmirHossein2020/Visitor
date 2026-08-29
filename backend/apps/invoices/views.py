@@ -1,7 +1,10 @@
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
+from django.db.models import DecimalField, Prefetch, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -19,14 +22,29 @@ from .serializers import (
 )
 
 
+def invoice_items_with_return_totals():
+    return InvoiceItem.objects.annotate(
+        _confirmed_returned_quantity=Coalesce(
+            Sum(
+                "sales_return_items__quantity",
+                filter=Q(sales_return_items__sales_return__status="confirmed"),
+            ),
+            Value(Decimal("0.000")),
+            output_field=DecimalField(max_digits=12, decimal_places=3),
+        )
+    )
+
+
 class InvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
-    http_method_names = ("get", "post", "patch", "delete", "head", "options")
+    http_method_names = ("get", "post", "delete", "head", "options")
 
     def get_queryset(self):
         queryset = Invoice.objects.filter(owner=self.request.user)
         if self.action in ("retrieve", "pdf"):
-            queryset = queryset.prefetch_related("items")
+            queryset = queryset.prefetch_related(
+                Prefetch("items", queryset=invoice_items_with_return_totals())
+            )
         return queryset
 
     def get_serializer_class(self):
@@ -130,13 +148,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except IntegrityError:
             raise ValidationError("صدور فاکتور تکراری مجاز نیست.")
 
-        invoice = Invoice.objects.prefetch_related("items").get(pk=invoice.pk)
+        invoice = Invoice.objects.prefetch_related(
+            Prefetch("items", queryset=invoice_items_with_return_totals())
+        ).get(pk=invoice.pk)
         return Response(InvoiceDetailSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
-        invoice = self.get_object()
-        invoice.status = Invoice.Status.CANCELLED
-        invoice.save(update_fields=("status", "updated_at"))
+        with transaction.atomic():
+            invoice = get_object_or_404(
+                Invoice.objects.select_for_update(), pk=kwargs["pk"], owner=request.user
+            )
+            invoice.status = Invoice.Status.CANCELLED
+            invoice.save(update_fields=("status", "updated_at"))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=("get",))

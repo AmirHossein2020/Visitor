@@ -1,5 +1,6 @@
 from decimal import Decimal
 from unittest.mock import patch
+from django.utils import timezone
 
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -205,6 +206,14 @@ class InvoiceAPITests(APITestCase):
         invoice = Invoice.objects.get(pk=invoice_id)
         self.assertEqual(invoice.status, Invoice.Status.CANCELLED)
 
+    def test_issued_invoice_cannot_be_patched(self):
+        self.authenticate(); invoice_id = self.issue(notes="یادداشت اصلی").data["id"]
+        response = self.client.patch(
+            f"{self.list_url}{invoice_id}/", {"notes": "تغییر غیرمجاز"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(Invoice.objects.get(pk=invoice_id).notes, "یادداشت اصلی")
+
     def test_owner_can_download_non_empty_pdf(self):
         self.authenticate(); invoice_id = self.issue().data["id"]
         response = self.client.get(f"{self.list_url}{invoice_id}/pdf/")
@@ -212,6 +221,7 @@ class InvoiceAPITests(APITestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertTrue(response.content.startswith(b"%PDF"))
         self.assertGreater(len(response.content), 1000)
+
 
     def test_unauthenticated_pdf_request_rejected(self):
         self.authenticate(); invoice_id = self.issue().data["id"]
@@ -265,3 +275,50 @@ class InvoiceAPITests(APITestCase):
         response = self.client.get(f"{self.list_url}{invoice_id}/pdf/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreater(len(response.content), 1000)
+
+
+class EndToEndBusinessScenarioTests(APITestCase):
+    def test_complete_business_workflow(self):
+        credentials = {
+            "full_name": "ویزیتور نهایی", "email": "final-flow@example.com",
+            "password": "StrongPass!2026", "password_confirm": "StrongPass!2026",
+        }
+        self.assertEqual(self.client.post("/api/auth/register/", credentials, format="json").status_code, 201)
+        login = self.client.post("/api/auth/login/", {"email": credentials["email"], "password": credentials["password"]}, format="json")
+        self.assertEqual(login.status_code, 200)
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer " + login.data["access"])
+
+        product = self.client.post("/api/products/", {"name": "محصول نهایی", "brand": "برند", "default_price": "100", "unit": "item"}, format="json")
+        customer = self.client.post("/api/customers/", {"name": "مشتری نهایی"}, format="json")
+        seller = self.client.post("/api/companies/", {"name": "فروشنده نهایی"}, format="json")
+        self.assertEqual((product.status_code, customer.status_code, seller.status_code), (201, 201, 201))
+
+        order = self.client.post("/api/orders/", {"customer": customer.data["id"], "status": "draft"}, format="json")
+        item = self.client.post(f"/api/orders/{order.data['id']}/items/", {"product": product.data["id"], "quantity": "6", "unit_price": "100"}, format="json")
+        self.assertEqual(self.client.patch(f"/api/orders/{order.data['id']}/", {"status": "confirmed"}, format="json").status_code, 200)
+        first_invoice = self.client.post("/api/invoices/", {"sales_order": order.data["id"], "seller_profile": seller.data["id"]}, format="json")
+        self.assertEqual(first_invoice.status_code, 201)
+        pdf = self.client.get(f"/api/invoices/{first_invoice.data['id']}/pdf/")
+        self.assertEqual(pdf.status_code, 200)
+        self.assertTrue(pdf.content.startswith(b"%PDF"))
+
+        self.assertEqual(self.client.patch(f"/api/orders/{order.data['id']}/items/{item.data['id']}/", {"quantity": "4"}, format="json").status_code, 200)
+        replacement = self.client.post("/api/invoices/", {"sales_order": order.data["id"], "seller_profile": seller.data["id"]}, format="json")
+        self.assertEqual(replacement.status_code, 201)
+        self.assertEqual(replacement.data["revision_number"], 2)
+        self.assertEqual(Invoice.objects.get(pk=first_invoice.data["id"]).status, Invoice.Status.SUPERSEDED)
+
+        sales_return = self.client.post("/api/returns/", {"invoice": replacement.data["id"]}, format="json")
+        self.assertEqual(self.client.post(f"/api/returns/{sales_return.data['id']}/items/", {"invoice_item": replacement.data["items"][0]["id"], "quantity": "2"}, format="json").status_code, 201)
+        self.assertEqual(self.client.patch(f"/api/returns/{sales_return.data['id']}/", {"status": "confirmed"}, format="json").status_code, 200)
+
+        purchase = self.client.post("/api/purchases/", {"customer": customer.data["id"], "purchase_date": timezone.localdate().isoformat(), "status": "draft"}, format="json")
+        self.assertEqual(self.client.post(f"/api/purchases/{purchase.data['id']}/items/", {"product": product.data["id"], "quantity": "10", "unit_price": "50"}, format="json").status_code, 201)
+        self.assertEqual(self.client.patch(f"/api/purchases/{purchase.data['id']}/", {"status": "confirmed"}, format="json").status_code, 200)
+
+        inventory = self.client.get(f"/api/inventory/{product.data['id']}/")
+        dashboard = self.client.get("/api/dashboard/")
+        reports = self.client.get("/api/reports/summary/")
+        self.assertEqual(Decimal(inventory.data["product"]["current_stock"]), Decimal("8"))
+        self.assertEqual(Decimal(dashboard.data["current_month"]["sales_total"]), Decimal("400"))
+        self.assertEqual(Decimal(reports.data["return_total"]), Decimal("200"))

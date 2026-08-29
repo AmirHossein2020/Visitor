@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from django.core.management.utils import get_random_secret_key
+from django.core.exceptions import ImproperlyConfigured
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,8 +20,22 @@ def load_local_env(path):
 
 load_local_env(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or get_random_secret_key()
-DEBUG = os.getenv("DEBUG", "False").lower() in {"1", "true", "yes", "on"}
+
+def env_bool(name, default=False):
+    return os.getenv(name, str(default)).lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name, default=""):
+    return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
+DEBUG = env_bool("DEBUG", False)
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-local-development-only"
+    else:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY is required when DEBUG is disabled.")
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
@@ -83,6 +97,7 @@ DATABASES = {
         "PASSWORD": os.getenv("DATABASE_PASSWORD", ""),
         "HOST": os.getenv("DATABASE_HOST", "localhost"),
         "PORT": os.getenv("DATABASE_PORT", "5432"),
+        "CONN_MAX_AGE": int(os.getenv("DATABASE_CONN_MAX_AGE", "60")),
     }
 }
 
@@ -98,9 +113,22 @@ TIME_ZONE = "Asia/Tehran"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
+
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", not DEBUG)
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+if env_bool("USE_X_FORWARDED_PROTO", False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

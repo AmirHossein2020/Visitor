@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from rest_framework import serializers
+from django.db.models import Sum
 
 from apps.companies.models import SellerProfile
 from apps.orders.models import SalesOrder
@@ -9,9 +10,22 @@ from .models import Invoice, InvoiceItem
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
+    returned_quantity = serializers.SerializerMethodField()
+    remaining_returnable_quantity = serializers.SerializerMethodField()
+
+    def get_returned_quantity(self, obj):
+        if not hasattr(obj, "_confirmed_returned_quantity"):
+            obj._confirmed_returned_quantity = obj.sales_return_items.filter(
+                sales_return__status="confirmed"
+            ).aggregate(total=Sum("quantity"))["total"] or Decimal("0.000")
+        return obj._confirmed_returned_quantity
+
+    def get_remaining_returnable_quantity(self, obj):
+        return obj.quantity - self.get_returned_quantity(obj)
+
     class Meta:
         model = InvoiceItem
-        fields = ("id", "product", "product_name", "brand", "unit", "quantity", "unit_price", "line_total", "description", "created_at")
+        fields = ("id", "product", "product_name", "brand", "unit", "quantity", "returned_quantity", "remaining_returnable_quantity", "unit_price", "line_total", "description", "created_at")
         read_only_fields = fields
 
 

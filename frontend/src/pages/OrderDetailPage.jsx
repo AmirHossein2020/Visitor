@@ -11,6 +11,7 @@ export default function OrderDetailPage({ orderId }) {
   const [results, setResults] = useState([]);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [isActing, setIsActing] = useState(false);
   const load = useCallback(() => getOrder(orderId).then((data) => { setOrder(data); setNotes(data.notes || ""); }).catch((requestError) => setError(getErrorMessage(requestError))), [orderId]);
   useEffect(() => { load(); }, [load]);
   const changeLocal = (itemId, field, value) => setOrder((current) => ({ ...current, items: current.items.map((item) => item.id === itemId ? { ...item, [field]: value } : item) }));
@@ -34,8 +35,11 @@ export default function OrderDetailPage({ orderId }) {
     catch (requestError) { setError(getErrorMessage(requestError)); }
   };
   const setStatus = async (status) => {
+    if (isActing) return;
+    setIsActing(true);
     try { await updateOrder(orderId, { status }); await load(); }
     catch (requestError) { setError(getErrorMessage(requestError)); }
+    finally { setIsActing(false); }
   };
   const saveNotes = async () => {
     try { await updateOrder(orderId, { notes }); await load(); }
@@ -57,7 +61,7 @@ export default function OrderDetailPage({ orderId }) {
         <aside className="space-y-4">
           <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><form className="flex gap-2" onSubmit={searchProducts}><input className="min-h-12 min-w-0 flex-1 rounded-xl border border-slate-300 px-3" placeholder="افزودن محصول" value={search} onChange={(event) => setSearch(event.target.value)} /><button className="min-h-12 rounded-xl bg-teal-700 px-3 font-semibold text-white" type="submit">جستجو</button></form>{results.map((product) => <button className="mt-2 min-h-12 w-full rounded-xl border border-slate-200 px-3 text-right" key={product.id} onClick={() => add(product)} type="button">{product.name} · {formatPrice(product.default_price)} تومان</button>)}</div>
           <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><label className="text-sm text-slate-600">یادداشت سفارش<textarea className="mt-2 min-h-24 w-full rounded-xl border border-slate-300 p-3" value={notes} onChange={(event) => setNotes(event.target.value)} /></label><button className="mt-2 min-h-11 w-full rounded-xl border border-teal-700 font-semibold text-teal-800" onClick={saveNotes} type="button">ذخیره یادداشت</button></div>
-          <div className="sticky bottom-3 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-slate-200"><div className="mb-4 flex justify-between text-lg font-bold"><span>جمع سفارش</span><span>{formatPrice(order.total_amount)} تومان</span></div><div className="grid grid-cols-2 gap-2"><button className="min-h-11 rounded-xl border border-slate-300 font-semibold" onClick={() => setStatus("draft")} type="button">پیش‌نویس</button><button className="min-h-11 rounded-xl bg-teal-700 font-semibold text-white" onClick={() => setStatus("confirmed")} type="button">تأیید سفارش</button></div></div>
+          <div className="sticky bottom-20 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-slate-200 sm:bottom-3"><div className="mb-4 flex justify-between text-lg font-bold"><span>جمع سفارش</span><span>{formatPrice(order.total_amount)} تومان</span></div><div className="grid grid-cols-2 gap-2"><button className="min-h-12 rounded-xl border border-slate-300 font-semibold disabled:opacity-60" disabled={isActing} onClick={() => setStatus("draft")} type="button">پیش‌نویس</button><button className="min-h-12 rounded-xl bg-teal-700 font-semibold text-white disabled:opacity-60" disabled={isActing} onClick={() => setStatus("confirmed")} type="button">{isActing ? "در حال ثبت…" : "تأیید سفارش"}</button></div></div>
         </aside>
       </div>}
     </OrderLayout>

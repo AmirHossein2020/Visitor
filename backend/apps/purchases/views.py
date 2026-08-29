@@ -12,6 +12,7 @@ from .serializers import (
     PurchaseSerializer,
     UpdatePurchaseItemSerializer,
 )
+from apps.products.inventory import reverse_purchase, sync_purchase, sync_purchase_item
 
 
 class PurchaseViewSet(viewsets.ModelViewSet):
@@ -29,10 +30,27 @@ class PurchaseViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    def update(self, request, *args, **kwargs):
+        with transaction.atomic():
+            return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        old_status = serializer.instance.status
+        purchase = serializer.save()
+        if purchase.status == Purchase.Status.CANCELLED and old_status == Purchase.Status.CONFIRMED:
+            reverse_purchase(purchase)
+        else:
+            sync_purchase(purchase)
+
     def destroy(self, request, *args, **kwargs):
-        purchase = self.get_object()
-        purchase.status = Purchase.Status.CANCELLED
-        purchase.save(update_fields=("status", "updated_at"))
+        with transaction.atomic():
+            purchase = get_object_or_404(
+                Purchase.objects.select_for_update(), pk=kwargs["pk"], owner=request.user
+            )
+            if purchase.status == Purchase.Status.CONFIRMED:
+                reverse_purchase(purchase)
+            purchase.status = Purchase.Status.CANCELLED
+            purchase.save(update_fields=("status", "updated_at"))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=("post",), url_path="items")
@@ -52,6 +70,8 @@ class PurchaseViewSet(viewsets.ModelViewSet):
                 unit_price=input_serializer.validated_data["unit_price"],
             )
             purchase.recalculate_total()
+            if purchase.status == Purchase.Status.CONFIRMED:
+                sync_purchase_item(item)
         return Response(PurchaseItemSerializer(item).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=("patch", "delete"), url_path=r"items/(?P<item_id>[^/.]+)")
@@ -60,6 +80,8 @@ class PurchaseViewSet(viewsets.ModelViewSet):
             purchase = get_object_or_404(Purchase.objects.select_for_update(), pk=pk, owner=request.user)
             item = get_object_or_404(PurchaseItem, pk=item_id, purchase=purchase)
             if request.method == "DELETE":
+                if purchase.status == Purchase.Status.CONFIRMED:
+                    sync_purchase_item(item, active=False)
                 item.delete()
                 purchase.recalculate_total()
                 return Response(status=status.HTTP_204_NO_CONTENT)
@@ -69,4 +91,6 @@ class PurchaseViewSet(viewsets.ModelViewSet):
                 setattr(item, field, value)
             item.save()
             purchase.recalculate_total()
+            if purchase.status == Purchase.Status.CONFIRMED:
+                sync_purchase_item(item)
         return Response(PurchaseItemSerializer(item).data)

@@ -12,6 +12,7 @@ from .serializers import (
     SalesOrderSerializer,
     UpdateOrderItemSerializer,
 )
+from apps.products.inventory import reverse_order, sync_order, sync_order_item
 
 
 class SalesOrderViewSet(viewsets.ModelViewSet):
@@ -31,8 +32,13 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    def update(self, request, *args, **kwargs):
+        with transaction.atomic():
+            return super().update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         order = serializer.instance
+        old_status = order.status
         meaningful_fields = {"customer", "notes"}
         changed = any(
             field in serializer.validated_data
@@ -40,12 +46,21 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             != (serializer.validated_data[field].id if field == "customer" else serializer.validated_data[field])
             for field in meaningful_fields
         )
-        serializer.save(version=order.version + 1 if changed else order.version)
+        order = serializer.save(version=order.version + 1 if changed else order.version)
+        if order.status == SalesOrder.Status.CANCELLED and old_status == SalesOrder.Status.CONFIRMED:
+            reverse_order(order)
+        else:
+            sync_order(order)
 
     def destroy(self, request, *args, **kwargs):
-        order = self.get_object()
-        order.status = SalesOrder.Status.CANCELLED
-        order.save(update_fields=("status", "updated_at"))
+        with transaction.atomic():
+            order = get_object_or_404(
+                SalesOrder.objects.select_for_update(), pk=kwargs["pk"], owner=request.user
+            )
+            if order.status == SalesOrder.Status.CONFIRMED:
+                reverse_order(order)
+            order.status = SalesOrder.Status.CANCELLED
+            order.save(update_fields=("status", "updated_at"))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=("post",), url_path="items")
@@ -75,6 +90,8 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                 ),
             )
             order.recalculate_total(increment_version=True)
+            if order.status == SalesOrder.Status.CONFIRMED:
+                sync_order_item(item)
         return Response(SalesOrderItemSerializer(item).data, status=status.HTTP_201_CREATED)
 
     @action(
@@ -91,6 +108,8 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             )
             item = get_object_or_404(SalesOrderItem, pk=item_id, order=order)
             if request.method == "DELETE":
+                if order.status == SalesOrder.Status.CONFIRMED:
+                    sync_order_item(item, active=False)
                 item.delete()
                 order.recalculate_total(increment_version=True)
                 return Response(status=status.HTTP_204_NO_CONTENT)
@@ -106,4 +125,6 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
             if changed:
                 item.save()
                 order.recalculate_total(increment_version=True)
+                if order.status == SalesOrder.Status.CONFIRMED:
+                    sync_order_item(item)
         return Response(SalesOrderItemSerializer(item).data)

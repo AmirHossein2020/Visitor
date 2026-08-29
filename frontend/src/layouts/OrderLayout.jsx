@@ -1,5 +1,6 @@
 import { navigate } from "../hooks/useRoute";
 import { useAuth } from "../services/AuthContext";
+import MobileNav from "../components/MobileNav";
 
 export default function OrderLayout({ title, children, backPath = "/orders" }) {
   const { logout } = useAuth();
@@ -15,7 +16,8 @@ export default function OrderLayout({ title, children, backPath = "/orders" }) {
           <button className="min-h-11 rounded-xl px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100" onClick={handleLogout} type="button">خروج</button>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-5 pb-24 sm:px-6 sm:py-8">{children}</main>
+      <MobileNav />
     </div>
   );
 }

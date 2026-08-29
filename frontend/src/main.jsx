@@ -2,10 +2,15 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AuthProvider } from "./services/AuthContext";
+import NetworkStatus from "./components/NetworkStatus";
 import "./styles.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <AuthProvider><App /></AuthProvider>
+    <AuthProvider><NetworkStatus /><App /></AuthProvider>
   </StrictMode>,
 );
+
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+}
