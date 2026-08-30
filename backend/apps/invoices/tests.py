@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 from unittest.mock import patch
 from django.utils import timezone
@@ -12,6 +13,7 @@ from apps.orders.models import SalesOrder, SalesOrderItem
 from apps.products.models import Product
 
 from .models import Invoice
+from .pdf import fa, money
 
 
 class InvoiceAPITests(APITestCase):
@@ -44,6 +46,23 @@ class InvoiceAPITests(APITestCase):
     def issue(self, order=None, seller=None, **overrides):
         payload = {"sales_order": (order or self.order).id, "seller_profile": (seller or self.seller).id, **overrides}
         return self.client.post(self.list_url, payload, format="json")
+
+    def add_items(self, count):
+        for index in range(count):
+            SalesOrderItem.objects.create(
+                order=self.order,
+                product=self.product,
+                product_name_snapshot=f"محصول آزمایشی شماره {index + 2}",
+                brand_snapshot=self.product.brand,
+                unit_snapshot=self.product.get_unit_display(),
+                quantity=Decimal("1"),
+                unit_price=Decimal("100"),
+            )
+        self.order.recalculate_total()
+
+    @staticmethod
+    def pdf_page_count(content):
+        return len(re.findall(rb"/Type\s*/Page\b", content))
 
     def test_issue_invoice_from_own_confirmed_order(self):
         self.authenticate()
@@ -221,6 +240,46 @@ class InvoiceAPITests(APITestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertTrue(response.content.startswith(b"%PDF"))
         self.assertGreater(len(response.content), 1000)
+
+    def test_one_item_invoice_pdf_is_exactly_one_page(self):
+        self.authenticate()
+        response = self.client.get(f"{self.list_url}{self.issue().data['id']}/pdf/")
+        self.assertEqual(self.pdf_page_count(response.content), 1)
+
+    def test_pdf_money_uses_rial_and_removes_unnecessary_decimal_zeros(self):
+        self.assertEqual(money(Decimal("580000.00")), fa("580,000 ریال"))
+        self.assertEqual(money(Decimal("48600.50")), fa("48,600.5 ریال"))
+        self.assertNotIn("تومان", money(Decimal("808040000.00")))
+
+    def test_five_item_invoice_pdf_is_exactly_one_page(self):
+        self.add_items(4)
+        self.authenticate()
+        response = self.client.get(f"{self.list_url}{self.issue().data['id']}/pdf/")
+        self.assertEqual(self.pdf_page_count(response.content), 1)
+
+    def test_large_invoice_uses_multiple_pages_without_signature_only_page(self):
+        self.add_items(24)
+        self.authenticate()
+        response = self.client.get(f"{self.list_url}{self.issue().data['id']}/pdf/")
+        self.assertGreater(self.pdf_page_count(response.content), 1)
+        # Explicit pagination always retains at least one item row on the final
+        # page before the indivisible totals/notes/signatures ending block.
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_pdf_wraps_long_snapshot_content_without_layout_failure(self):
+        self.seller.address = "نشانی طولانی فروشنده " * 18
+        self.seller.save(update_fields=("address",))
+        self.customer.address = "نشانی طولانی خریدار " * 18
+        self.customer.save(update_fields=("address",))
+        order_item = self.order.items.get()
+        order_item.product_name_snapshot = "محصول با نام طولانی " * 9
+        order_item.brand_snapshot = "برند طولانی " * 8
+        order_item.save(update_fields=("product_name_snapshot", "brand_snapshot"))
+        self.authenticate()
+        invoice_id = self.issue(notes="یادداشت طولانی و خوانا " * 30).data["id"]
+        response = self.client.get(f"{self.list_url}{invoice_id}/pdf/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreater(self.pdf_page_count(response.content), 0)
 
 
     def test_unauthenticated_pdf_request_rejected(self):

@@ -1,4 +1,5 @@
 import { apiRequest } from "./api";
+import { formatMoney } from "./formatters";
 
 export const units = [
   { value: "item", label: "عدد" },
@@ -26,5 +27,5 @@ export const deactivateProduct = (id) =>
   apiRequest("/products/" + id + "/", { method: "DELETE" });
 
 export function formatPrice(value) {
-  return new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 2 }).format(Number(value));
+  return formatMoney(value);
 }

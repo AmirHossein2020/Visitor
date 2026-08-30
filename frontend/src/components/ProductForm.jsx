@@ -37,7 +37,7 @@ export default function ProductForm({ initialValue = emptyProduct, onSubmit, sub
     <form className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-7" onSubmit={submit}>
       <FormField id="name" name="name" label="نام محصول" required disabled={isSubmitting} value={form.name} onChange={update} />
       <FormField id="brand" name="brand" label="برند (اختیاری)" disabled={isSubmitting} value={form.brand} onChange={update} />
-      <FormField id="default_price" name="default_price" label="قیمت پیش‌فرض (تومان)" type="number" inputMode="decimal" min="0" step="0.01" required disabled={isSubmitting} value={form.default_price} onChange={update} />
+      <FormField id="default_price" name="default_price" label="قیمت پیش‌فرض (ریال)" type="number" inputMode="decimal" min="0" step="0.01" required disabled={isSubmitting} value={form.default_price} onChange={update} />
       <label className="block" htmlFor="unit">
         <span className="mb-1.5 block text-sm font-medium text-slate-700">واحد</span>
         <select id="unit" name="unit" className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-base outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" required disabled={isSubmitting} value={form.unit} onChange={update}>

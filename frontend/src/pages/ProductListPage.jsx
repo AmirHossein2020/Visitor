@@ -59,7 +59,7 @@ export default function ProductListPage() {
             <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200" key={product.id}>
               <h2 className="text-lg font-bold text-slate-900">{product.name}</h2>
               <p className="mt-1 min-h-6 text-sm text-slate-500">{product.brand || "بدون برند"}</p>
-              <p className="mt-4 font-semibold text-teal-800">{formatPrice(product.default_price)} تومان</p>
+              <p className="mt-4 font-semibold text-teal-800">{formatPrice(product.default_price)}</p>
               <p className="mt-1 text-sm text-slate-600">واحد: {product.unit_display}</p>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <button className="min-h-11 rounded-xl border border-slate-300 font-semibold text-slate-700 hover:bg-slate-50" onClick={() => navigate("/products/" + product.id + "/edit")} type="button">ویرایش</button>

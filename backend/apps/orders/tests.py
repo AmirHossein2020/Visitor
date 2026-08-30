@@ -91,6 +91,19 @@ class SalesOrderAPITests(APITestCase):
         order.refresh_from_db()
         self.assertEqual(order.total_amount, Decimal("350.00"))
 
+    def test_rial_prices_are_stored_and_calculated_without_scaling(self):
+        order = self.create_order()
+        self.authenticate()
+        response = self.add_item(order, quantity="600", unit_price="580000")
+        self.assertEqual(Decimal(response.data["unit_price"]), Decimal("580000"))
+        self.assertEqual(Decimal(response.data["line_total"]), Decimal("348000000"))
+        order.refresh_from_db()
+        self.assertEqual(order.total_amount, Decimal("348000000"))
+
+        second_order = self.create_order()
+        response = self.add_item(second_order, quantity="900", unit_price="48600")
+        self.assertEqual(Decimal(response.data["line_total"]), Decimal("43740000"))
+
     def test_item_update_recalculates_totals(self):
         order = self.create_order()
         self.authenticate()

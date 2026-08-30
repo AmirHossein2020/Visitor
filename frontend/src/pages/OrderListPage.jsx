@@ -20,7 +20,7 @@ export default function OrderListPage() {
           {orders.map((order) => <button className="min-h-32 rounded-2xl bg-white p-5 text-right shadow-sm ring-1 ring-slate-200 hover:ring-teal-300" key={order.id} onClick={() => navigate("/orders/" + order.id)} type="button">
             <span className="block text-lg font-bold text-slate-900">{order.customer_name}</span>
             <span className="mt-2 block text-sm text-slate-500">{new Intl.DateTimeFormat("fa-IR").format(new Date(order.created_at))} · {order.status_display}</span>
-            <span className="mt-4 block font-semibold text-teal-800">{formatPrice(order.total_amount)} تومان</span>
+            <span className="mt-4 block font-semibold text-teal-800">{formatPrice(order.total_amount)}</span>
           </button>)}
         </div>
       )}
