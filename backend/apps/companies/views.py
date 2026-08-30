@@ -1,5 +1,6 @@
 from django.db.models import Q
 from rest_framework import permissions, status, viewsets
+from apps.subscriptions.permissions import HasActiveSubscription
 from rest_framework.response import Response
 
 from .models import SellerProfile
@@ -7,7 +8,7 @@ from .serializers import SellerProfileSerializer
 
 
 class SellerProfileViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
     serializer_class = SellerProfileSerializer
 
     def get_queryset(self):

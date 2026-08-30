@@ -8,7 +8,7 @@ import { getErrorMessage } from "../services/api";
 const initialForm = { full_name: "", email: "", phone_number: "", password: "", password_confirm: "" };
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, login } = useAuth();
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,7 +24,8 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     try {
       await register(form);
-      navigate("/login?registered=1", { replace: true });
+      await login({ email: form.email, password: form.password });
+      navigate("/pricing", { replace: true });
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {

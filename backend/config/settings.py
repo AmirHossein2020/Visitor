@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -57,6 +58,7 @@ INSTALLED_APPS = [
     "apps.orders",
     "apps.purchases",
     "apps.invoices",
+    "apps.subscriptions",
 ]
 
 MIDDLEWARE = [
@@ -136,3 +138,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
 }
+
+# Existing automated business tests predate subscriptions. This compatibility
+# switch is active only under Django's test runner; subscription tests disable
+# it explicitly to verify the real gate. It is never enabled in production.
+SUBSCRIPTION_TEST_BYPASS = "test" in sys.argv

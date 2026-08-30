@@ -1,5 +1,6 @@
 from django.db.models import Q
 from rest_framework import permissions, viewsets
+from apps.subscriptions.permissions import HasActiveSubscription
 from rest_framework.response import Response
 
 from .models import Customer
@@ -7,7 +8,7 @@ from .serializers import CustomerSerializer
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
     serializer_class = CustomerSerializer
 
     def get_queryset(self):

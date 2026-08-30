@@ -6,6 +6,7 @@ urlpatterns = [
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
     path("reports/", include("apps.orders.report_urls")),
     path("auth/", include("apps.accounts.urls")),
+    path("subscriptions/", include("apps.subscriptions.urls")),
     path("products/", include("apps.products.urls")),
     path("inventory/", include("apps.products.inventory_urls")),
     path("customers/", include("apps.customers.urls")),

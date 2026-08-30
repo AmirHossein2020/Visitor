@@ -2,6 +2,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
+from apps.subscriptions.permissions import HasActiveSubscription
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -42,7 +43,7 @@ def validate_return_quantity(invoice_item, quantity, *, sales_return):
 
 
 class SalesReturnViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
     http_method_names = ("get", "post", "patch", "delete", "head", "options")
 
     def get_queryset(self):

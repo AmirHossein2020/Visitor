@@ -70,3 +70,16 @@ pg_dump --format=custom --file=field_sales.dump field_sales
 ```
 
 Keep backups outside the application host and protect them with the same care as production credentials.
+
+## 8. Subscription bootstrap
+
+Migration `subscriptions.0002_seed_plans` creates editable development plans: a 30-day monthly plan at 990,000 Rial and a 365-day yearly plan at 9,900,000 Rial. Review and update these values in Django admin before production launch; the frontend always reads current active plans from the API.
+
+Existing users are not silently granted an unlimited production subscription. For a finite local-development activation, run:
+
+```bash
+cd backend
+python manage.py activate_subscription user@example.com --plan monthly-development
+```
+
+Superusers bypass customer subscription checks for platform administration. Customer business APIs require an effective active subscription; authentication and subscription renewal endpoints remain available after expiration.

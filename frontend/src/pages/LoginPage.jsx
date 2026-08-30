@@ -4,6 +4,7 @@ import FormField from "../components/FormField";
 import { navigate } from "../hooks/useRoute";
 import { useAuth } from "../services/AuthContext";
 import { getErrorMessage } from "../services/api";
+import { getMySubscription } from "../services/subscriptions";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -19,7 +20,8 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(form);
-      navigate("/", { replace: true });
+      const subscription = await getMySubscription();
+      navigate(subscription.is_active ? "/app" : "/account/subscription", { replace: true });
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {

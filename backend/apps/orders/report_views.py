@@ -5,6 +5,7 @@ from django.db.models import Count, DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework import permissions
+from apps.subscriptions.permissions import HasActiveSubscription
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -84,7 +85,7 @@ def summary_for(user, start, end):
 
 
 class DashboardView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
 
     def get(self, request):
         today = timezone.localdate()
@@ -115,7 +116,7 @@ class DashboardView(APIView):
 
 
 class SummaryReportView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
 
     def get(self, request):
         start, end = parse_range(request)
@@ -123,7 +124,7 @@ class SummaryReportView(APIView):
 
 
 class ProductSalesReportView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
 
     def get(self, request):
         start, end = parse_range(request)
@@ -141,7 +142,7 @@ class ProductSalesReportView(APIView):
 
 
 class CustomerSalesReportView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
 
     def get(self, request):
         start, end = parse_range(request)

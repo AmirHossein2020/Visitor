@@ -6,6 +6,7 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
+from apps.subscriptions.permissions import HasActiveSubscription
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -36,7 +37,7 @@ def invoice_items_with_return_totals():
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
     http_method_names = ("get", "post", "delete", "head", "options")
 
     def get_queryset(self):

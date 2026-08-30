@@ -4,6 +4,7 @@ from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions
+from apps.subscriptions.permissions import HasActiveSubscription
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -25,7 +26,7 @@ def inventory_queryset(user):
 
 
 class InventoryListView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
 
     def get(self, request):
         queryset = inventory_queryset(request.user).order_by("name")
@@ -36,7 +37,7 @@ class InventoryListView(APIView):
 
 
 class InventoryDetailView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
 
     def get(self, request, product_id):
         product = get_object_or_404(inventory_queryset(request.user), pk=product_id)

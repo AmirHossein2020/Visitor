@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
+from apps.subscriptions.permissions import HasActiveSubscription
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -16,7 +17,7 @@ from apps.products.inventory import reverse_order, sync_order, sync_order_item
 
 
 class SalesOrderViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, HasActiveSubscription)
 
     def get_queryset(self):
         queryset = SalesOrder.objects.filter(owner=self.request.user).select_related("customer")
