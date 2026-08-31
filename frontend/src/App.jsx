@@ -2,9 +2,14 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { navigate, useRoute } from "./hooks/useRoute";
 import { useAuth } from "./services/AuthContext";
 import { getMySubscription } from "./services/subscriptions";
+import { AdminErrorBoundary, AdminUnavailable } from "./components/platform-admin/AdminUI";
 
 const pages = {
   Landing: lazy(() => import("./pages/LandingPage")), Login: lazy(() => import("./pages/LoginPage")), Register: lazy(() => import("./pages/RegisterPage")),
+  AdminDashboard: lazy(() => import("./pages/platform-admin/AdminDashboardPage")), AdminUsers: lazy(() => import("./pages/platform-admin/AdminUsersPage")), AdminUserDetail: lazy(() => import("./pages/platform-admin/AdminUserDetailPage")),
+  AdminOrders: lazy(() => import("./pages/platform-admin/AdminSubscriptionOrdersPage")), AdminPayments: lazy(() => import("./pages/platform-admin/AdminPaymentsPage")), AdminSubscriptions: lazy(() => import("./pages/platform-admin/AdminSubscriptionsPage")), AdminPlans: lazy(() => import("./pages/platform-admin/AdminPlansPage")),
+  AdminSettings: lazy(() => import("./pages/platform-admin/AdminSettingsPage")), AdminAuditLog: lazy(() => import("./pages/platform-admin/AdminAuditLogPage")),
+  SubscriptionPayment: lazy(() => import("./pages/SubscriptionPaymentPage")),
   Pricing: lazy(() => import("./pages/PricingPage")), Subscription: lazy(() => import("./pages/SubscriptionPage")), Required: lazy(() => import("./pages/SubscriptionRequiredPage")), Home: lazy(() => import("./pages/HomePage")),
   Customers: lazy(() => import("./pages/CustomerListPage")), CustomerNew: lazy(() => import("./pages/CustomerCreatePage")), CustomerDetail: lazy(() => import("./pages/CustomerDetailPage")), CustomerEdit: lazy(() => import("./pages/CustomerEditPage")),
   Products: lazy(() => import("./pages/ProductListPage")), ProductNew: lazy(() => import("./pages/ProductCreatePage")), ProductEdit: lazy(() => import("./pages/ProductEditPage")),
@@ -55,14 +60,35 @@ function businessPage(path) {
 }
 
 function AppRoutes() {
-  const path = useRoute(); const { user, isLoading } = useAuth();
+  const path = useRoute(); const { user, isLoading, authError, loadUser } = useAuth();
+  const isPlatformAdmin = Boolean(user?.is_staff || user?.is_superuser);
   useEffect(() => { if (!isLoading && !user && path.startsWith("/account")) navigate("/login", { replace: true }); }, [user,isLoading,path]);
   if (isLoading) return <main className="grid min-h-dvh place-items-center bg-slate-50">در حال بررسی حساب…</main>;
+  if (path.startsWith("/platform-admin") && authError?.status === 0) return <AdminErrorBoundary><AdminUnavailable retry={loadUser}/></AdminErrorBoundary>;
   if (path === "/") return <pages.Landing />;
   if (path === "/pricing") return <pages.Pricing />;
   if (path === "/register" && !user) return <pages.Register />;
   if (path === "/login" && !user) return <pages.Login />;
+  if (["/login","/register","/account/subscription"].includes(path) && isPlatformAdmin) { navigate("/platform-admin", { replace: true }); return null; }
   if (path === "/account/subscription" && user) return <pages.Subscription />;
+  const paymentMatch = path.match(/^\/account\/subscription\/orders\/(\d+)\/payment$/);
+  if (paymentMatch && user) return <pages.SubscriptionPayment orderId={paymentMatch[1]} />;
+  if (path.startsWith("/platform-admin")) {
+    if (!user) { navigate("/login", { replace: true }); return null; }
+    if (!isPlatformAdmin) { navigate("/account/subscription", { replace: true }); return null; }
+    const safeAdmin = page => <AdminErrorBoundary key={path}>{page}</AdminErrorBoundary>;
+    if (path === "/platform-admin") return safeAdmin(<pages.AdminDashboard />);
+    if (path === "/platform-admin/users") return safeAdmin(<pages.AdminUsers />);
+    let adminDetail = path.match(/^\/platform-admin\/users\/(\d+)$/); if (adminDetail) return safeAdmin(<pages.AdminUserDetail userId={adminDetail[1]} />);
+    if (path === "/platform-admin/subscription-orders") return safeAdmin(<pages.AdminOrders />);
+    adminDetail = path.match(/^\/platform-admin\/subscription-orders\/(\d+)$/); if (adminDetail) return safeAdmin(<pages.AdminOrders orderId={adminDetail[1]} />);
+    if (path === "/platform-admin/payments") return safeAdmin(<pages.AdminPayments />);
+    adminDetail = path.match(/^\/platform-admin\/payments\/(\d+)$/); if (adminDetail) return safeAdmin(<pages.AdminPayments paymentId={adminDetail[1]} />);
+    if (path === "/platform-admin/subscriptions") return safeAdmin(<pages.AdminSubscriptions />);
+    if (path === "/platform-admin/plans") return safeAdmin(<pages.AdminPlans />);
+    if (path === "/platform-admin/settings") return safeAdmin(<pages.AdminSettings />);
+    if (path === "/platform-admin/audit-log") return safeAdmin(<pages.AdminAuditLog />);
+  }
   const business = businessPage(path);
   if (business) {
     if (!user) { navigate("/login", { replace: true }); return null; }

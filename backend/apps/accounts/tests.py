@@ -1,3 +1,4 @@
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -85,3 +86,29 @@ class AuthenticationAPITests(APITestCase):
     def test_unauthenticated_me_rejected(self):
         response = self.client.get(self.me_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_admin_login_and_me_return_authoritative_role_flags(self):
+        admin = User.objects.create_user(email="staff@example.com", full_name="مدیر", password="StrongPass!2026", is_staff=True)
+        login = self.client.post(self.login_url, {"email": admin.email, "password": "StrongPass!2026"}, format="json")
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+        self.assertTrue(login.data["user"]["is_staff"])
+        self.assertFalse(login.data["user"]["is_superuser"])
+        self.client.force_authenticate(admin)
+        me = self.client.get(self.me_url)
+        self.assertEqual(me.data["id"], admin.id)
+        self.assertTrue(me.data["is_staff"])
+
+    @override_settings(FRONTEND_URL="http://localhost:5173", DEBUG=False)
+    def test_primary_admin_redirects_and_internal_fallback_remains(self):
+        response = self.client.get("/admin/")
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response["Location"], "http://localhost:5173/platform-admin")
+        fallback = self.client.get("/internal-django-admin/")
+        self.assertEqual(fallback.status_code, status.HTTP_302_FOUND)
+        self.assertIn("/internal-django-admin/login/", fallback["Location"])
+
+    @override_settings(DEBUG=True, ALLOWED_HOSTS=["192.168.43.64"])
+    def test_development_admin_redirect_preserves_lan_hostname(self):
+        response = self.client.get("/admin/", HTTP_HOST="192.168.43.64:8000")
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response["Location"], "http://192.168.43.64:5173/platform-admin")

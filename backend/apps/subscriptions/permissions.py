@@ -5,7 +5,7 @@ from rest_framework.permissions import BasePermission
 def active_subscription_for(user):
     if not user or not user.is_authenticated:
         return None
-    if user.is_superuser:
+    if user.is_staff or user.is_superuser:
         return True
     return next((subscription for subscription in user.subscriptions.select_related("plan").filter(status="active") if subscription.is_effective), None)
 

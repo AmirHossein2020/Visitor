@@ -1,0 +1,33 @@
+import { apiBlob, apiRequest } from "./api";
+
+const base = "/platform-admin";
+export const adminDashboard = () => apiRequest(`${base}/dashboard/`);
+export const adminUsers = (query = "") => apiRequest(`${base}/users/${query ? `?${query}` : ""}`);
+export const adminUser = (id) => apiRequest(`${base}/users/${id}/`);
+export const updateAdminUser = (id, data) => apiRequest(`${base}/users/${id}/`, { method: "PATCH", body: JSON.stringify(data) });
+export const changeUserRole = (id, action, reason = "") => apiRequest(`${base}/users/${id}/${action}/`, { method: "POST", body: JSON.stringify({ reason }) });
+export const activateUserSubscription = (id, planId) => apiRequest(`${base}/users/${id}/subscriptions/activate/`, { method: "POST", body: JSON.stringify({ plan_id: planId }) });
+export const adminOrders = (status = "") => apiRequest(`${base}/subscription-orders/${status ? `?status=${status}` : ""}`);
+export const adminOrder = (id) => apiRequest(`${base}/subscription-orders/${id}/`);
+export const approveOrder = (id) => apiRequest(`${base}/subscription-orders/${id}/approve/`, { method: "POST" });
+export const rejectOrder = (id, notes = "") => apiRequest(`${base}/subscription-orders/${id}/reject/`, { method: "POST", body: JSON.stringify({ notes }) });
+export const adminSubscriptions = (query = "") => apiRequest(`${base}/subscriptions/${query ? `?${query}` : ""}`);
+export const extendSubscription = (id, planId) => apiRequest(`${base}/subscriptions/${id}/extend/`, { method: "POST", body: JSON.stringify({ plan_id: planId }) });
+export const cancelSubscription = (id) => apiRequest(`${base}/subscriptions/${id}/cancel/`, { method: "POST" });
+export const adjustSubscription = (id, days, reason) => apiRequest(`${base}/subscriptions/${id}/adjust/`, { method: "POST", body: JSON.stringify({ days, reason }) });
+export const adminPlans = () => apiRequest(`${base}/plans/`);
+export const createAdminPlan = (data) => apiRequest(`${base}/plans/`, { method: "POST", body: JSON.stringify(data) });
+export const updateAdminPlan = (id, data) => apiRequest(`${base}/plans/${id}/`, { method: "PATCH", body: JSON.stringify(data) });
+export const adminPayments = (status = "") => apiRequest(`${base}/payments/${status ? `?status=${status}` : ""}`);
+export const adminPayment = (id) => apiRequest(`${base}/payments/${id}/`);
+export const approvePayment = (id) => apiRequest(`${base}/payments/${id}/approve/`, { method: "POST" });
+export const rejectPayment = (id, adminNote) => apiRequest(`${base}/payments/${id}/reject/`, { method: "POST", body: JSON.stringify({ admin_note: adminNote }) });
+export const getPlatformSettings = () => apiRequest(`${base}/settings/`);
+export const updatePlatformSettings = data => apiRequest(`${base}/settings/`, { method: "PATCH", body: JSON.stringify(data) });
+export const adminAuditLog = (query = "") => apiRequest(`${base}/audit-log/${query ? `?${query}` : ""}`);
+export const openPaymentReceipt = async (id) => {
+  const blob = await apiBlob(`/subscriptions/payments/${id}/receipt/`);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+};

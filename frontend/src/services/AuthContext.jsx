@@ -1,20 +1,24 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { apiRequest, clearTokens, saveTokens } from "./api";
+import { apiRequest, clearTokens, hasAccessToken, saveTokens } from "./api";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
 
   const loadUser = useCallback(async () => {
+    if (!hasAccessToken()) { setUser(null); setAuthError(null); return null; }
     try {
       const currentUser = await apiRequest("/auth/me/");
       setUser(currentUser);
+      setAuthError(null);
       return currentUser;
     } catch (error) {
       if (error?.status === 401) clearTokens();
-      setUser(null);
+      if (error?.status === 401) setUser(null);
+      setAuthError(error);
       return null;
     }
   }, []);
@@ -30,6 +34,7 @@ export function AuthProvider({ children }) {
     });
     saveTokens(data);
     setUser(data.user);
+    setAuthError(null);
     return data.user;
   }, []);
 
@@ -44,8 +49,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout, loadUser }),
-    [user, isLoading, login, register, logout, loadUser],
+    () => ({ user, isLoading, authError, login, register, logout, loadUser }),
+    [user, isLoading, authError, login, register, logout, loadUser],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

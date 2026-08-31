@@ -83,3 +83,9 @@ python manage.py activate_subscription user@example.com --plan monthly-developme
 ```
 
 Superusers bypass customer subscription checks for platform administration. Customer business APIs require an effective active subscription; authentication and subscription renewal endpoints remain available after expiration.
+
+## 9. Manual subscription payments
+
+Configure the public transfer destination through the `MANUAL_PAYMENT_*` environment variables shown in `.env.example`; never commit real bank details. A customer creates a subscription order, submits a tracking code or receipt image, and waits for a platform administrator to approve the payment. Approval reuses the transactional subscription-order activation path.
+
+Receipt uploads accept validated JPG, PNG, or WebP content up to `MAX_RECEIPT_UPLOAD_BYTES` (5 MB by default). Files are stored below `MEDIA_ROOT/subscription-receipts/` with generated names and are delivered through authenticated API endpoints only. Do not expose `MEDIA_ROOT` as a public directory in production. Use private object storage or protected reverse-proxy delivery, retain encrypted backups, and apply an appropriate financial-record retention policy.

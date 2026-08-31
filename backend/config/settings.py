@@ -39,9 +39,10 @@ if not SECRET_KEY:
         raise ImproperlyConfigured("DJANGO_SECRET_KEY is required when DEBUG is disabled.")
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,192.168.43.64").split(",")
     if host.strip()
 ]
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -117,6 +118,16 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+MAX_RECEIPT_UPLOAD_BYTES = int(os.getenv("MAX_RECEIPT_UPLOAD_BYTES", str(5 * 1024 * 1024)))
+MANUAL_PAYMENT_PUBLIC_INFO = {
+    "account_holder": os.getenv("MANUAL_PAYMENT_ACCOUNT_HOLDER", ""),
+    "card_number": os.getenv("MANUAL_PAYMENT_CARD_NUMBER", ""),
+    "iban": os.getenv("MANUAL_PAYMENT_IBAN", ""),
+    "bank_name": os.getenv("MANUAL_PAYMENT_BANK_NAME", ""),
+    "instructions": os.getenv("MANUAL_PAYMENT_INSTRUCTIONS", ""),
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 

@@ -19,7 +19,11 @@ export default function LoginPage() {
     setError("");
     setIsSubmitting(true);
     try {
-      await login(form);
+      const loggedInUser = await login(form);
+      if (loggedInUser.is_staff || loggedInUser.is_superuser) {
+        navigate("/platform-admin", { replace: true });
+        return;
+      }
       const subscription = await getMySubscription();
       navigate(subscription.is_active ? "/app" : "/account/subscription", { replace: true });
     } catch (requestError) {
