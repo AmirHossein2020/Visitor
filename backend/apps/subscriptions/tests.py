@@ -319,3 +319,42 @@ class PlatformAdminAPITests(APITestCase):
         order.refresh_from_db(); payment.refresh_from_db()
         self.assertEqual(order.amount_snapshot, Decimal("990000")); self.assertEqual(payment.amount_snapshot, Decimal("990000"))
         self.assertTrue(PlatformAdminAuditLog.objects.filter(action="plan_updated", target_id=str(self.plan.id)).exists())
+
+    def test_discount_is_authoritative_and_order_snapshots_are_immutable(self):
+        self.plan.discount_percent = 20
+        self.plan.save(update_fields=("discount_percent",))
+        self.client.force_authenticate(self.user)
+        response = self.client.post("/api/subscriptions/orders/", {"plan_id": self.plan.id}, format="json")
+        self.assertEqual(response.status_code, 201)
+        order = SubscriptionOrder.objects.get(pk=response.data["id"])
+        self.assertEqual(order.original_price_snapshot, Decimal("990000"))
+        self.assertEqual(order.discount_percent_snapshot, 20)
+        self.assertEqual(order.amount_snapshot, Decimal("792000"))
+        self.plan.price = Decimal("2000000")
+        self.plan.discount_percent = 0
+        self.plan.save(update_fields=("price", "discount_percent"))
+        order.refresh_from_db()
+        self.assertEqual(order.amount_snapshot, Decimal("792000"))
+
+    def test_payment_approval_completes_related_order_transactionally(self):
+        order = SubscriptionOrder.objects.create(user=self.user, plan=self.plan, amount_snapshot=self.plan.price)
+        self.client.force_authenticate(self.user)
+        payment_id = self.submit_payment(order).data["id"]
+        self.auth_admin()
+        self.assertEqual(self.client.post(f"/api/platform-admin/payments/{payment_id}/approve/").status_code, 200)
+        order.refresh_from_db()
+        payment = SubscriptionPayment.objects.get(pk=payment_id)
+        self.assertEqual(payment.status, SubscriptionPayment.Status.APPROVED)
+        self.assertEqual(order.status, SubscriptionOrder.Status.APPROVED)
+        self.assertTrue(UserSubscription.objects.filter(user=self.user, status=UserSubscription.Status.ACTIVE).exists())
+
+    def test_plan_safe_delete_hard_deletes_unused_and_archives_referenced(self):
+        unused = SubscriptionPlan.objects.create(name="Unused", slug="unused", billing_period="monthly", duration_days=1, price=1)
+        SubscriptionOrder.objects.create(user=self.user, plan=self.plan, amount_snapshot=self.plan.price)
+        self.auth_admin()
+        self.assertEqual(self.client.delete(f"/api/platform-admin/plans/{unused.id}/").status_code, 204)
+        archived = self.client.delete(f"/api/platform-admin/plans/{self.plan.id}/")
+        self.assertEqual(archived.status_code, 200)
+        self.plan.refresh_from_db()
+        self.assertFalse(self.plan.is_active)
+        self.assertTrue(PlatformAdminAuditLog.objects.filter(action="plan_archived", target_id=str(self.plan.id)).exists())

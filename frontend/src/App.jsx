@@ -10,7 +10,7 @@ const pages = {
   AdminOrders: lazy(() => import("./pages/platform-admin/AdminSubscriptionOrdersPage")), AdminPayments: lazy(() => import("./pages/platform-admin/AdminPaymentsPage")), AdminSubscriptions: lazy(() => import("./pages/platform-admin/AdminSubscriptionsPage")), AdminPlans: lazy(() => import("./pages/platform-admin/AdminPlansPage")),
   AdminSettings: lazy(() => import("./pages/platform-admin/AdminSettingsPage")), AdminAuditLog: lazy(() => import("./pages/platform-admin/AdminAuditLogPage")),
   SubscriptionPayment: lazy(() => import("./pages/SubscriptionPaymentPage")),
-  Pricing: lazy(() => import("./pages/PricingPage")), Subscription: lazy(() => import("./pages/SubscriptionPage")), Required: lazy(() => import("./pages/SubscriptionRequiredPage")), Home: lazy(() => import("./pages/HomePage")),
+  Pricing: lazy(() => import("./pages/PricingPage")), Profile: lazy(() => import("./pages/ProfilePage")), Subscription: lazy(() => import("./pages/SubscriptionPage")), Required: lazy(() => import("./pages/SubscriptionRequiredPage")), Home: lazy(() => import("./pages/HomePage")),
   Customers: lazy(() => import("./pages/CustomerListPage")), CustomerNew: lazy(() => import("./pages/CustomerCreatePage")), CustomerDetail: lazy(() => import("./pages/CustomerDetailPage")), CustomerEdit: lazy(() => import("./pages/CustomerEditPage")),
   Products: lazy(() => import("./pages/ProductListPage")), ProductNew: lazy(() => import("./pages/ProductCreatePage")), ProductEdit: lazy(() => import("./pages/ProductEditPage")),
   Orders: lazy(() => import("./pages/OrderListPage")), OrderNew: lazy(() => import("./pages/OrderCreatePage")), OrderDetail: lazy(() => import("./pages/OrderDetailPage")),
@@ -69,7 +69,8 @@ function AppRoutes() {
   if (path === "/pricing") return <pages.Pricing />;
   if (path === "/register" && !user) return <pages.Register />;
   if (path === "/login" && !user) return <pages.Login />;
-  if (["/login","/register","/account/subscription"].includes(path) && isPlatformAdmin) { navigate("/platform-admin", { replace: true }); return null; }
+  if (["/login","/register","/account/subscription","/account/profile"].includes(path) && isPlatformAdmin) { navigate("/platform-admin", { replace: true }); return null; }
+  if (path === "/account/profile" && user) return <pages.Profile />;
   if (path === "/account/subscription" && user) return <pages.Subscription />;
   const paymentMatch = path.match(/^\/account\/subscription\/orders\/(\d+)\/payment$/);
   if (paymentMatch && user) return <pages.SubscriptionPayment orderId={paymentMatch[1]} />;

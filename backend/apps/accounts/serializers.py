@@ -12,6 +12,18 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("id", "email", "full_name", "phone_number", "date_joined", "last_login", "is_active", "is_staff", "is_superuser")
+        read_only_fields = ("id", "email", "date_joined", "last_login", "is_active", "is_staff", "is_superuser")
+
+    def validate_full_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("نام و نام خانوادگی الزامی است.")
+        return value.strip()
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)

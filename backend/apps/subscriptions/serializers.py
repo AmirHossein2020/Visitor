@@ -9,10 +9,11 @@ from .models import SubscriptionOrder, SubscriptionPayment, SubscriptionPlan, Us
 
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
     billing_period_display = serializers.CharField(source="get_billing_period_display", read_only=True)
+    final_price = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
 
     class Meta:
         model = SubscriptionPlan
-        fields = ("id", "name", "slug", "billing_period", "billing_period_display", "duration_days", "price", "is_featured", "description")
+        fields = ("id", "name", "slug", "billing_period", "billing_period_display", "duration_days", "price", "discount_percent", "final_price", "is_featured", "description")
 
 
 class UserSubscriptionSerializer(serializers.ModelSerializer):
@@ -39,12 +40,18 @@ class SubscriptionOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubscriptionOrder
-        fields = ("id", "plan", "plan_id", "amount_snapshot", "status", "status_display", "payment_reference", "notes", "approved_at", "created_at", "latest_payment")
-        read_only_fields = ("amount_snapshot", "status", "payment_reference", "approved_at")
+        fields = ("id", "plan", "plan_id", "original_price_snapshot", "discount_percent_snapshot", "amount_snapshot", "status", "status_display", "payment_reference", "notes", "approved_at", "created_at", "latest_payment")
+        read_only_fields = ("original_price_snapshot", "discount_percent_snapshot", "amount_snapshot", "status", "payment_reference", "approved_at")
 
     def create(self, validated_data):
         plan = validated_data["plan"]
-        return SubscriptionOrder.objects.create(user=self.context["request"].user, plan=plan, amount_snapshot=plan.price, notes=validated_data.get("notes", ""))
+        return SubscriptionOrder.objects.create(
+            user=self.context["request"].user, plan=plan,
+            original_price_snapshot=plan.price,
+            discount_percent_snapshot=plan.discount_percent,
+            amount_snapshot=plan.final_price,
+            notes=validated_data.get("notes", ""),
+        )
 
     def get_latest_payment(self, obj):
         payment = obj.payments.first()

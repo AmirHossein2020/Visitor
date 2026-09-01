@@ -10,3 +10,8 @@ export function formatMoney(value) {
   const localizedDecimal = meaningfulDecimal.replace(/[0-9]/g, (digit) => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
   return `${groupedInteger}${localizedDecimal ? `٫${localizedDecimal}` : ""} ریال`;
 }
+
+export function formatDateTime(value) {
+  return formatJalaliDateTime(value);
+}
+import { formatJalaliDateTime } from "./jalali";

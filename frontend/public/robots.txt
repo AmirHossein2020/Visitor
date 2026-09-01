@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /account/
+Disallow: /platform-admin/
+Disallow: /api/
+
+Sitemap: __SITE_URL__/sitemap.xml

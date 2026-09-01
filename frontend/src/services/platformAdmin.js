@@ -18,6 +18,7 @@ export const adjustSubscription = (id, days, reason) => apiRequest(`${base}/subs
 export const adminPlans = () => apiRequest(`${base}/plans/`);
 export const createAdminPlan = (data) => apiRequest(`${base}/plans/`, { method: "POST", body: JSON.stringify(data) });
 export const updateAdminPlan = (id, data) => apiRequest(`${base}/plans/${id}/`, { method: "PATCH", body: JSON.stringify(data) });
+export const removeAdminPlan = id => apiRequest(`${base}/plans/${id}/`, { method: "DELETE" });
 export const adminPayments = (status = "") => apiRequest(`${base}/payments/${status ? `?status=${status}` : ""}`);
 export const adminPayment = (id) => apiRequest(`${base}/payments/${id}/`);
 export const approvePayment = (id) => apiRequest(`${base}/payments/${id}/approve/`, { method: "POST" });

@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -11,6 +11,8 @@ from apps.invoices.models import Invoice, InvoiceItem
 from apps.products.models import StockMovement
 from apps.purchases.models import Purchase
 from django.utils import timezone
+from django.test import override_settings
+from apps.subscriptions.models import SubscriptionOrder, SubscriptionPlan, UserSubscription
 
 from .models import SalesOrder, SalesOrderItem, SalesReturn, SalesReturnItem
 
@@ -322,6 +324,24 @@ class DashboardReportAPITests(APITestCase):
         self.assertEqual(Decimal(response.data["current_month"]["sales_total"]), Decimal("1200"))
         self.assertEqual(response.data["today"]["invoices_count"], 1)
 
+    @override_settings(SUBSCRIPTION_TEST_BYPASS=False)
+    def test_current_month_metrics_ignore_old_sales_and_subscription_orders(self):
+        plan = SubscriptionPlan.objects.create(name="Test", slug="dashboard-test", billing_period="monthly", duration_days=30, price=100)
+        now = timezone.now()
+        UserSubscription.objects.create(user=self.user, plan=plan, status="active", starts_at=now - timedelta(days=1), expires_at=now + timedelta(days=29))
+        current = self.invoice(number="CURRENT", amount="1200")
+        old = self.invoice(number="OLD", amount="5000")
+        old_time = now - timedelta(days=35)
+        SalesOrder.objects.filter(pk=old.sales_order_id).update(created_at=old_time)
+        Invoice.objects.filter(pk=old.pk).update(issued_at=old_time)
+        SubscriptionOrder.objects.create(user=self.user, plan=plan, amount_snapshot=plan.price)
+        response = self.client.get("/api/dashboard/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        month = response.data["current_month"]
+        self.assertEqual(Decimal(month["sales_total"]), Decimal("1200"))
+        self.assertEqual(Decimal(month["net_sales"]), Decimal("1200"))
+        self.assertEqual(month["orders_count"], 1)
+
     def test_superseded_and_cancelled_invoices_are_excluded(self):
         self.invoice(number="ACTIVE", amount="700")
         self.invoice(number="OLD", amount="1000", status_value=Invoice.Status.SUPERSEDED)
@@ -351,6 +371,17 @@ class DashboardReportAPITests(APITestCase):
         response = self.client.get("/api/reports/summary/", {"from": date_value, "to": date_value})
         self.assertEqual(Decimal(response.data["sales_total"]), Decimal("100"))
         self.assertEqual(self.client.get("/api/reports/summary/", {"from": "bad", "to": date_value}).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_dashboard_accepts_canonical_range_for_a_true_jalali_month(self):
+        inside = self.invoice(number="SHAHRIVAR", amount="700")
+        outside = self.invoice(number="MORDAD", amount="900")
+        Invoice.objects.filter(pk=inside.pk).update(issued_at=timezone.make_aware(datetime(2026, 9, 1, 12)))
+        SalesOrder.objects.filter(pk=inside.sales_order_id).update(created_at=timezone.make_aware(datetime(2026, 9, 1, 12)))
+        Invoice.objects.filter(pk=outside.pk).update(issued_at=timezone.make_aware(datetime(2026, 8, 22, 12)))
+        SalesOrder.objects.filter(pk=outside.sales_order_id).update(created_at=timezone.make_aware(datetime(2026, 8, 22, 12)))
+        response = self.client.get("/api/dashboard/", {"from": "2026-08-23", "to": "2026-09-22"})
+        self.assertEqual(Decimal(response.data["current_month"]["sales_total"]), Decimal("700"))
+        self.assertEqual(response.data["current_month"]["orders_count"], 1)
 
     def test_top_products_use_invoice_snapshots(self):
         self.invoice(number="P1", amount="500", quantity="5")

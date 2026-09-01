@@ -89,6 +89,7 @@ class DashboardView(APIView):
 
     def get(self, request):
         today = timezone.localdate()
+        selected_start, selected_end = parse_range(request)
         products = Product.objects.filter(owner=request.user).annotate(
             current_stock=Coalesce(
                 Sum("stock_movements__quantity"),
@@ -101,7 +102,7 @@ class DashboardView(APIView):
         recent_returns = SalesReturn.objects.filter(owner=request.user).select_related("invoice")[:5]
         return Response({
             "today": summary_for(request.user, today, today),
-            "current_month": summary_for(request.user, month_start(today), today),
+            "current_month": summary_for(request.user, selected_start, selected_end),
             "inventory": {
                 "total_products": products.count(),
                 "negative_stock_count": products.filter(current_stock__lt=0).count(),

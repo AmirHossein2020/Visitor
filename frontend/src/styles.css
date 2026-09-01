@@ -9,10 +9,15 @@
 }
 
 html { direction: rtl; overflow-x: hidden; }
+html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
 body { margin: 0; min-width: 320px; min-height: 100vh; overflow-x: hidden; }
 button, input, select, textarea { font: inherit; }
 button { touch-action: manipulation; }
 input, select, textarea { max-width: 100%; }
+.section-title { margin-top: .75rem; max-width: 52rem; font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 900; line-height: 1.5; letter-spacing: -.02em; }
+.section-copy { margin-top: 1rem; max-width: 42rem; color: #475569; line-height: 2; }
+.landing a:focus-visible, .landing button:focus-visible, .landing summary:focus-visible { outline: 3px solid #34d399; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 .admin-button { min-height: 2.75rem; border-radius: .75rem; border: 1px solid #cbd5e1; padding: 0 .9rem; font-weight: 700; }
 .admin-input { min-height: 2.75rem; border-radius: .75rem; border: 1px solid #cbd5e1; padding: 0 .75rem; }
 @media (max-width: 639px) {

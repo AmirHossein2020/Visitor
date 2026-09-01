@@ -4,6 +4,7 @@ from pathlib import Path
 import arabic_reshaper
 from bidi.algorithm import get_display
 from django.utils import timezone
+from .date_utils import format_jalali_datetime
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
@@ -185,7 +186,7 @@ def build_invoice_pdf(invoice):
     }
 
     issued = timezone.localtime(invoice.issued_at)
-    date_text = persian_digits(issued.strftime("%Y/%m/%d - %H:%M"))
+    date_text = persian_digits(format_jalali_datetime(issued))
     header = Table([
         [Paragraph(fa("فاکتور فروش"), styles["title"])],
         [Paragraph(fa(invoice.seller_name), styles["seller"])],

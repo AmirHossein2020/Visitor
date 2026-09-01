@@ -6,6 +6,8 @@ from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.core.validators import MaxValueValidator, MinValueValidator
+from decimal import Decimal, ROUND_HALF_UP
 
 
 class SubscriptionPlan(models.Model):
@@ -18,6 +20,7 @@ class SubscriptionPlan(models.Model):
     billing_period = models.CharField(max_length=10, choices=BillingPeriod.choices)
     duration_days = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=18, decimal_places=2)
+    discount_percent = models.PositiveSmallIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(99)])
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
     description = models.CharField(max_length=300, blank=True)
@@ -30,6 +33,11 @@ class SubscriptionPlan(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def final_price(self):
+        discount = self.price * Decimal(self.discount_percent) / Decimal("100")
+        return (self.price - discount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class UserSubscription(models.Model):
@@ -79,6 +87,8 @@ class SubscriptionOrder(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscription_orders")
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT, related_name="orders")
     amount_snapshot = models.DecimalField(max_digits=18, decimal_places=2)
+    original_price_snapshot = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    discount_percent_snapshot = models.PositiveSmallIntegerField(default=0)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_subscription_orders")

@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from rest_framework import mixins, permissions, serializers, viewsets
@@ -38,7 +39,7 @@ def role_of(user):
 class AdminPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubscriptionPlan
-        fields = ("id", "name", "slug", "billing_period", "duration_days", "price", "is_active", "is_featured", "description", "sort_order", "created_at", "updated_at")
+        fields = ("id", "name", "slug", "billing_period", "duration_days", "price", "discount_percent", "final_price", "is_active", "is_featured", "description", "sort_order", "created_at", "updated_at")
         read_only_fields = ("created_at", "updated_at")
 
     def validate_price(self, value):
@@ -49,6 +50,11 @@ class AdminPlanSerializer(serializers.ModelSerializer):
     def validate_duration_days(self, value):
         if value < 1:
             raise serializers.ValidationError("مدت پلن باید حداقل یک روز باشد.")
+        return value
+
+    def validate_discount_percent(self, value):
+        if not 0 <= value <= 99:
+            raise serializers.ValidationError("درصد تخفیف باید بین صفر تا ۹۹ باشد.")
         return value
 
 
@@ -73,7 +79,7 @@ class AdminOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubscriptionOrder
-        fields = ("id", "user", "user_email", "plan", "plan_name", "amount_snapshot", "status", "payment_reference", "notes", "approved_at", "approved_by_email", "created_at", "latest_payment", "payment_attempts")
+        fields = ("id", "user", "user_email", "plan", "plan_name", "original_price_snapshot", "discount_percent_snapshot", "amount_snapshot", "status", "payment_reference", "notes", "approved_at", "approved_by_email", "created_at", "latest_payment", "payment_attempts")
         read_only_fields = fields
 
     def get_latest_payment(self, obj):
@@ -396,14 +402,32 @@ class AdminPlanViewSet(viewsets.ModelViewSet):
     pagination_class = AdminPagination
     serializer_class = AdminPlanSerializer
     queryset = SubscriptionPlan.objects.order_by("sort_order", "price")
-    http_method_names = ("get", "post", "patch", "head", "options")
+    http_method_names = ("get", "post", "patch", "delete", "head", "options")
 
     def perform_create(self, serializer):
         plan = serializer.save(); audit(self.request.user, "plan_created", plan, after={"price": str(plan.price), "is_active": plan.is_active})
 
     def perform_update(self, serializer):
-        plan = self.get_object(); before = {"price": str(plan.price), "is_active": plan.is_active, "duration_days": plan.duration_days}
-        updated = serializer.save(); audit(self.request.user, "plan_updated", updated, before, {"price": str(updated.price), "is_active": updated.is_active, "duration_days": updated.duration_days})
+        plan = self.get_object(); before = {"price": str(plan.price), "discount_percent": plan.discount_percent, "is_active": plan.is_active, "duration_days": plan.duration_days}
+        updated = serializer.save(); audit(self.request.user, "plan_updated", updated, before, {"price": str(updated.price), "discount_percent": updated.discount_percent, "is_active": updated.is_active, "duration_days": updated.duration_days})
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        plan = SubscriptionPlan.objects.select_for_update().get(pk=self.get_object().pk)
+        referenced = plan.orders.exists() or plan.subscriptions.exists()
+        if referenced:
+            before = {"is_active": plan.is_active}
+            plan.is_active = False
+            plan.save(update_fields=("is_active", "updated_at"))
+            audit(request.user, "plan_archived", plan, before, {"is_active": False}, "پلن دارای سابقه است و به‌جای حذف، آرشیو شد.")
+            return Response({"detail": "پلن به دلیل داشتن سابقه آرشیو شد.", "archived": True}, status=200)
+        try:
+            display, plan_id = str(plan), plan.pk
+            plan.delete()
+        except ProtectedError:
+            return Response({"detail": "این پلن دارای سابقه است و قابل حذف دائمی نیست."}, status=409)
+        PlatformAdminAuditLog.objects.create(actor=request.user, action="plan_deleted", target_type="SubscriptionPlan", target_id=str(plan_id), target_display=display)
+        return Response(status=204)
 
 
 class AdminPaymentSerializer(SubscriptionPaymentSerializer):

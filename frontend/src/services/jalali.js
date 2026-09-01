@@ -1,0 +1,12 @@
+const latin = new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-latn", {year:"numeric",month:"numeric",day:"numeric",timeZone:"Asia/Tehran"});
+export const jalaliMonths=["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+const parts=date=>Object.fromEntries(latin.formatToParts(date).filter(x=>x.type!=="literal").map(x=>[x.type,Number(x.value)]));
+export function gregorianToJalali(value){const date=value instanceof Date?value:new Date(`${value}T12:00:00Z`);const p=parts(date);return {year:p.year,month:p.month,day:p.day}}
+export function jalaliToGregorian(year,month,day){const wanted=year*10000+month*100+day;let low=Date.UTC(year+620,2,1)/86400000,high=Date.UTC(year+622,3,1)/86400000;while(low<=high){const mid=Math.floor((low+high)/2),p=gregorianToJalali(new Date(mid*86400000)),key=p.year*10000+p.month*100+p.day;if(key===wanted)return new Date(mid*86400000).toISOString().slice(0,10);if(key<wanted)low=mid+1;else high=mid-1}throw new Error("تاریخ شمسی نامعتبر است.")}
+export function daysInJalaliMonth(year,month){const next=month===12?[year+1,1]:[year,month+1];const a=new Date(`${jalaliToGregorian(year,month,1)}T00:00:00Z`),b=new Date(`${jalaliToGregorian(next[0],next[1],1)}T00:00:00Z`);return Math.round((b-a)/86400000)}
+export function jalaliMonthRange(year,month){return {from:jalaliToGregorian(year,month,1),to:jalaliToGregorian(year,month,daysInJalaliMonth(year,month))}}
+const digits=value=>String(value).replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[d]);
+export function formatJalaliDate(value){if(!value)return "—";const p=gregorianToJalali(String(value).slice(0,10));return digits(`${p.year}/${String(p.month).padStart(2,"0")}/${String(p.day).padStart(2,"0")}`)}
+export function formatJalaliDateTime(value){if(!value)return "—";const date=new Date(value);if(Number.isNaN(date.getTime()))return "—";const datePart=formatJalaliDate(new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tehran",year:"numeric",month:"2-digit",day:"2-digit"}).format(date));const time=new Intl.DateTimeFormat("fa-IR",{timeZone:"Asia/Tehran",hour:"2-digit",minute:"2-digit",hour12:false}).format(date);return `${datePart} - ${time}`}
+export function jalaliMonthTitle(year,month){return `${jalaliMonths[month-1]} ${digits(year)}`}
+export function todayIso(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tehran",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
