@@ -9,6 +9,7 @@ const pages = {
   AdminDashboard: lazy(() => import("./pages/platform-admin/AdminDashboardPage")), AdminUsers: lazy(() => import("./pages/platform-admin/AdminUsersPage")), AdminUserDetail: lazy(() => import("./pages/platform-admin/AdminUserDetailPage")),
   AdminOrders: lazy(() => import("./pages/platform-admin/AdminSubscriptionOrdersPage")), AdminPayments: lazy(() => import("./pages/platform-admin/AdminPaymentsPage")), AdminSubscriptions: lazy(() => import("./pages/platform-admin/AdminSubscriptionsPage")), AdminPlans: lazy(() => import("./pages/platform-admin/AdminPlansPage")),
   AdminSettings: lazy(() => import("./pages/platform-admin/AdminSettingsPage")), AdminAuditLog: lazy(() => import("./pages/platform-admin/AdminAuditLogPage")),
+  AdminSupport: lazy(() => import("./pages/platform-admin/AdminSupportPage")), AdminSupportDetail: lazy(() => import("./pages/platform-admin/AdminSupportDetailPage")),
   SubscriptionPayment: lazy(() => import("./pages/SubscriptionPaymentPage")),
   Pricing: lazy(() => import("./pages/PricingPage")), Profile: lazy(() => import("./pages/ProfilePage")), Subscription: lazy(() => import("./pages/SubscriptionPage")), Required: lazy(() => import("./pages/SubscriptionRequiredPage")), Home: lazy(() => import("./pages/HomePage")),
   Customers: lazy(() => import("./pages/CustomerListPage")), CustomerNew: lazy(() => import("./pages/CustomerCreatePage")), CustomerDetail: lazy(() => import("./pages/CustomerDetailPage")), CustomerEdit: lazy(() => import("./pages/CustomerEditPage")),
@@ -19,6 +20,7 @@ const pages = {
   Returns: lazy(() => import("./pages/ReturnListPage")), ReturnNew: lazy(() => import("./pages/ReturnCreatePage")), ReturnDetail: lazy(() => import("./pages/ReturnDetailPage")),
   Inventory: lazy(() => import("./pages/InventoryListPage")), InventoryDetail: lazy(() => import("./pages/InventoryDetailPage")), Reports: lazy(() => import("./pages/ReportsPage")),
   Companies: lazy(() => import("./pages/CompanyListPage")), CompanyNew: lazy(() => import("./pages/CompanyCreatePage")), CompanyDetail: lazy(() => import("./pages/CompanyDetailPage")), CompanyEdit: lazy(() => import("./pages/CompanyEditPage")),
+  Support: lazy(() => import("./pages/SupportListPage")), SupportNew: lazy(() => import("./pages/SupportCreatePage")), SupportDetail: lazy(() => import("./pages/SupportDetailPage")),
 };
 
 function BusinessGate({ children }) {
@@ -72,6 +74,9 @@ function AppRoutes() {
   if (["/login","/register","/account/subscription","/account/profile"].includes(path) && isPlatformAdmin) { navigate("/platform-admin", { replace: true }); return null; }
   if (path === "/account/profile" && user) return <pages.Profile />;
   if (path === "/account/subscription" && user) return <pages.Subscription />;
+  if (path === "/support" && user) return <pages.Support />;
+  if (path === "/support/new" && user) return <pages.SupportNew />;
+  const supportMatch = path.match(/^\/support\/(\d+)$/); if (supportMatch && user) return <pages.SupportDetail ticketId={supportMatch[1]} />;
   const paymentMatch = path.match(/^\/account\/subscription\/orders\/(\d+)\/payment$/);
   if (paymentMatch && user) return <pages.SubscriptionPayment orderId={paymentMatch[1]} />;
   if (path.startsWith("/platform-admin")) {
@@ -89,6 +94,8 @@ function AppRoutes() {
     if (path === "/platform-admin/plans") return safeAdmin(<pages.AdminPlans />);
     if (path === "/platform-admin/settings") return safeAdmin(<pages.AdminSettings />);
     if (path === "/platform-admin/audit-log") return safeAdmin(<pages.AdminAuditLog />);
+    if (path === "/platform-admin/support") return safeAdmin(<pages.AdminSupport />);
+    adminDetail = path.match(/^\/platform-admin\/support\/(\d+)$/); if (adminDetail) return safeAdmin(<pages.AdminSupportDetail ticketId={adminDetail[1]} />);
   }
   const business = businessPage(path);
   if (business) {

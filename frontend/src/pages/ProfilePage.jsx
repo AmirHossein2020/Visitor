@@ -1,3 +1,92 @@
-import {useEffect,useState} from "react";import {navigate} from "../hooks/useRoute";import {getMyProfile,getMySubscription,listSubscriptionOrders,updateMyProfile} from "../services/subscriptions";import {formatDateTime} from "../services/formatters";import {StatusBadge} from "../components/platform-admin/AdminUI";
-const labels={pending:"در انتظار پرداخت",pending_review:"رسید ارسال شده و در انتظار بررسی",approved:"پرداخت تأیید شد",rejected:"پرداخت رد شد",cancelled:"لغو شده",active:"فعال",expired:"منقضی شده"};
-export default function ProfilePage(){const [state,setState]=useState(),[form,setForm]=useState({full_name:"",phone_number:""}),[error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState(false);const load=()=>{setError("");return Promise.all([getMyProfile(),getMySubscription(),listSubscriptionOrders()]).then(([profile,account,orders])=>{setState({profile,account,orders});setForm({full_name:profile.full_name||"",phone_number:profile.phone_number||""})}).catch(()=>setError("دریافت اطلاعات حساب با خطا مواجه شد."))};useEffect(()=>{load()},[]);const save=async e=>{e.preventDefault();setSaving(true);setError("");try{await updateMyProfile(form);setNotice("اطلاعات حساب ذخیره شد.");await load()}catch(x){setError(Object.values(x.data||{}).flat().join(" ")||"ذخیره اطلاعات ممکن نشد.")}finally{setSaving(false)}};if(!state)return <main className="grid min-h-dvh place-items-center bg-slate-50 p-4">{error?<div className="text-center"><p className="text-red-700">{error}</p><button className="admin-button mt-4" onClick={load}>تلاش مجدد</button></div>:"در حال دریافت حساب کاربری…"}</main>;const {profile,account,orders}=state,s=account.subscription,latest=orders[0],payment=latest?.latest_payment;return <main className="min-h-dvh bg-slate-50 p-4 sm:p-8"><div className="mx-auto max-w-4xl"><header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-black">حساب کاربری</h1><p className="mt-2 text-slate-600">اطلاعات شخصی و وضعیت دسترسی شما</p></div><nav className="flex gap-2"><button className="admin-button" onClick={()=>navigate("/account/subscription")}>اشتراک و پرداخت‌ها</button>{account.is_active&&<button className="admin-button bg-emerald-800 text-white" onClick={()=>navigate("/app")}>پنل کسب‌وکار</button>}</nav></header>{error&&<p className="mt-5 rounded-xl bg-red-50 p-4 text-red-700">{error}</p>}{notice&&<p className="mt-5 rounded-xl bg-emerald-50 p-4 text-emerald-800">{notice}</p>}<div className="mt-7 grid gap-5 lg:grid-cols-2"><section className="rounded-3xl bg-white p-6 ring-1 ring-slate-200"><h2 className="text-xl font-black">اطلاعات حساب</h2><dl className="mt-4 grid gap-3 text-sm"><div><dt className="text-slate-500">ایمیل</dt><dd className="mt-1 font-bold" dir="ltr">{profile.email}</dd></div><div><dt className="text-slate-500">تاریخ ثبت‌نام</dt><dd className="mt-1 font-bold">{formatDateTime(profile.date_joined)}</dd></div><div><dt className="text-slate-500">وضعیت حساب</dt><dd className="mt-1"><StatusBadge value={profile.is_active?"active":"inactive"}/></dd></div></dl><form className="mt-5 grid gap-3" onSubmit={save}><label className="text-sm">نام و نام خانوادگی<input required className="admin-input mt-1 w-full" value={form.full_name} onChange={e=>setForm({...form,full_name:e.target.value})}/></label><label className="text-sm">شماره تماس (اختیاری)<input className="admin-input mt-1 w-full" value={form.phone_number} onChange={e=>setForm({...form,phone_number:e.target.value})}/></label><button disabled={saving} className="min-h-12 rounded-xl bg-emerald-800 font-bold text-white disabled:opacity-50">ذخیره اطلاعات</button></form></section><section className="rounded-3xl bg-white p-6 ring-1 ring-slate-200"><div className="flex justify-between gap-3"><h2 className="text-xl font-black">وضعیت اشتراک</h2><StatusBadge value={s?.effective_status||payment?.status||latest?.status||"inactive"}/></div>{s?<><h3 className="mt-5 text-2xl font-black">{s.plan.name}</h3><p className="mt-1 text-sm text-slate-500">{s.plan.billing_period==="yearly"?"سالانه":"ماهانه"}</p><dl className="mt-5 grid gap-4 text-sm"><div><dt className="text-slate-500">فعال‌شده</dt><dd className="font-bold">{formatDateTime(s.starts_at)}</dd></div><div><dt className="text-slate-500">انقضا</dt><dd className="font-bold">{formatDateTime(s.expires_at)}</dd></div><div><dt className="text-slate-500">زمان باقی‌مانده</dt><dd className="font-bold">{s.effective_status==="active"?`${s.days_remaining} روز باقی‌مانده`:"منقضی شده"}</dd></div></dl></>:<><p className="mt-6 font-bold">اشتراک فعالی ندارید</p>{latest&&<div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm"><p>{labels[payment?.status]||labels[latest.status]}</p>{payment?.admin_note&&<p className="mt-2 text-red-700">دلیل رد: {payment.admin_note}</p>}</div>}</>}<button className="mt-6 min-h-12 w-full rounded-xl border border-emerald-700 font-bold text-emerald-800" onClick={()=>navigate(s?.effective_status==="active"?"/account/subscription":"/pricing")}>{s?.effective_status==="active"?"مشاهده سوابق اشتراک":"مشاهده پلن‌ها"}</button></section></div></div></main>}
+import { useEffect, useState } from "react";
+import AppShell from "../components/AppShell";
+import FormField from "../components/FormField";
+import { Badge, Button, Card, Icon, StatePanel } from "../components/ui";
+import { navigate } from "../hooks/useRoute";
+import { formatDateTime } from "../services/formatters";
+import { getMyProfile, getMySubscription, listSubscriptionOrders, updateMyProfile } from "../services/subscriptions";
+
+const labels = { pending: "در انتظار پرداخت", pending_review: "رسید ارسال شده و در انتظار بررسی", approved: "پرداخت تأیید شد", rejected: "پرداخت رد شد", cancelled: "لغو شده", active: "فعال", expired: "منقضی شده", inactive: "غیرفعال" };
+const tones = { active: "success", approved: "success", pending: "warning", pending_review: "warning", rejected: "danger", cancelled: "danger", expired: "neutral", inactive: "neutral" };
+const Meta = ({ label, children, ltr }) => <div className="account-meta"><dt>{label}</dt><dd dir={ltr ? "ltr" : undefined}>{children}</dd></div>;
+
+export default function ProfilePage() {
+  const [state, setState] = useState();
+  const [form, setForm] = useState({ full_name: "", phone_number: "" });
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    setError("");
+    return Promise.all([getMyProfile(), getMySubscription(), listSubscriptionOrders()])
+      .then(([profile, account, orders]) => {
+        setState({ profile, account, orders });
+        setForm({ full_name: profile.full_name || "", phone_number: profile.phone_number || "" });
+      }).catch(() => setError("دریافت اطلاعات حساب با خطا مواجه شد."));
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async (event) => {
+    event.preventDefault(); setSaving(true); setError(""); setNotice("");
+    try { await updateMyProfile(form); setNotice("اطلاعات حساب ذخیره شد."); await load(); }
+    catch (requestError) { setError(Object.values(requestError.data || {}).flat().join(" ") || "ذخیره اطلاعات ممکن نشد."); }
+    finally { setSaving(false); }
+  };
+
+  if (!state) return <AppShell title="حساب کاربری" subtitle="اطلاعات شخصی و وضعیت دسترسی"><StatePanel type={error ? "error" : "loading"} title={error || "در حال دریافت حساب کاربری"} action={error && <Button onClick={load}>تلاش مجدد</Button>} /></AppShell>;
+
+  const { profile, account, orders } = state;
+  const subscription = account.subscription;
+  const latest = orders[0];
+  const payment = latest?.latest_payment;
+  const status = subscription?.effective_status || payment?.status || latest?.status || "inactive";
+
+  return <AppShell
+    title="حساب کاربری"
+    subtitle="اطلاعات شخصی، حساب و دسترسی شما"
+    backPath="/app"
+    action={<Button variant="secondary" onClick={() => navigate("/account/subscription")}><span className="label-short">اشتراک</span><span className="label-wide">اشتراک و پرداخت‌ها</span></Button>}
+  >
+    <div className="account-page">
+      {error && <StatePanel type="error" title="انجام عملیات ممکن نشد" description={error} />}
+      {notice && <div className="account-notice" role="status">{notice}</div>}
+      <section className="account-overview">
+        <div className="account-avatar"><Icon name="user" className="size-7" /></div>
+        <div><p className="ui-eyebrow">پروفایل شخصی</p><h2>{profile.full_name}</h2><p dir="ltr">{profile.email}</p></div>
+        <Badge tone={profile.is_active ? "success" : "neutral"}>{profile.is_active ? "حساب فعال" : "حساب غیرفعال"}</Badge>
+      </section>
+
+      <div className="account-grid">
+        <Card>
+          <div className="profile-section-title"><p className="ui-eyebrow">اطلاعات شخصی</p><h3>مشخصات قابل ویرایش</h3></div>
+          <form className="account-form" onSubmit={save}>
+            <FormField id="profile_name" label="نام و نام خانوادگی" required value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} />
+            <FormField id="profile_phone" label="شماره تماس (اختیاری)" inputMode="tel" value={form.phone_number} onChange={(event) => setForm({ ...form, phone_number: event.target.value })} />
+            <Button disabled={saving}>{saving ? "در حال ذخیره…" : "ذخیره اطلاعات"}</Button>
+          </form>
+        </Card>
+
+        <Card>
+          <div className="profile-section-title"><p className="ui-eyebrow">اطلاعات حساب</p><h3>عضویت و وضعیت حساب</h3></div>
+          <dl className="account-meta-grid">
+            <Meta label="ایمیل" ltr>{profile.email}</Meta>
+            <Meta label="تاریخ ثبت‌نام">{formatDateTime(profile.date_joined)}</Meta>
+            <Meta label="وضعیت حساب"><Badge tone={profile.is_active ? "success" : "neutral"}>{profile.is_active ? "فعال" : "غیرفعال"}</Badge></Meta>
+          </dl>
+        </Card>
+      </div>
+
+      <Card className="subscription-summary">
+        <div className="subscription-summary-head"><div><p className="ui-eyebrow">خلاصه اشتراک</p><h3>{subscription?.plan?.name || "اشتراک فعالی ندارید"}</h3></div><Badge tone={tones[status] || "neutral"}>{labels[status] || status}</Badge></div>
+        {subscription ? <dl className="summary-stats">
+          <Meta label="نوع دسترسی">{subscription.source === "free_trial" ? "آزمایش رایگان" : subscription.plan.billing_period === "yearly" ? "اشتراک سالانه" : "اشتراک ماهانه"}</Meta>
+          <Meta label="شروع">{formatDateTime(subscription.starts_at)}</Meta>
+          <Meta label="انقضا">{formatDateTime(subscription.expires_at)}</Meta>
+          <Meta label="زمان باقی‌مانده">{subscription.source === "free_trial" ? `${subscription.hours_remaining} ساعت` : subscription.effective_status === "active" ? `${subscription.days_remaining} روز` : "منقضی شده"}</Meta>
+        </dl> : latest && <div className="pending-subscription"><p>{labels[payment?.status] || labels[latest.status]}</p>{payment?.admin_note && <p>دلیل رد: {payment.admin_note}</p>}</div>}
+        <div className="summary-actions"><Button onClick={() => navigate(subscription?.effective_status === "active" ? "/account/subscription" : "/pricing")}>{subscription?.effective_status === "active" ? "مشاهده جزئیات اشتراک" : "مشاهده پلن‌ها"}</Button>{account.is_active && <Button variant="ghost" onClick={() => navigate("/app")}>بازگشت به پنل</Button>}</div>
+      </Card>
+    </div>
+  </AppShell>;
+}

@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "apps.purchases",
     "apps.invoices",
     "apps.subscriptions",
+    "apps.support",
 ]
 
 MIDDLEWARE = [
@@ -121,6 +122,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 MAX_RECEIPT_UPLOAD_BYTES = int(os.getenv("MAX_RECEIPT_UPLOAD_BYTES", str(5 * 1024 * 1024)))
+MAX_SUPPORT_UPLOAD_BYTES = int(os.getenv("MAX_SUPPORT_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 MANUAL_PAYMENT_PUBLIC_INFO = {
     "account_holder": os.getenv("MANUAL_PAYMENT_ACCOUNT_HOLDER", ""),
     "card_number": os.getenv("MANUAL_PAYMENT_CARD_NUMBER", ""),

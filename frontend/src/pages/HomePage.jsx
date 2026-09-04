@@ -1,4 +1,122 @@
-import {useEffect,useState} from "react";import {navigate} from "../hooks/useRoute";import {useAuth} from "../services/AuthContext";import {getDashboard} from "../services/reports";import {formatPrice} from "../services/products";import {gregorianToJalali,jalaliMonthRange,jalaliMonthTitle,todayIso} from "../services/jalali";import MobileNav from "../components/MobileNav";
-const current=gregorianToJalali(todayIso());
-const valid=data=>{const m=data?.current_month;if([m?.sales_total,m?.net_sales,m?.orders_count].some(v=>v==null))throw new Error();return data};
-export default function HomePage(){const {user,logout}=useAuth(),[month,setMonth]=useState({year:current.year,month:current.month}),[dashboard,setDashboard]=useState(),[error,setError]=useState("");const range=jalaliMonthRange(month.year,month.month),isCurrent=month.year===current.year&&month.month===current.month;const load=()=>{setError("");setDashboard();getDashboard(range.from,range.to).then(valid).then(setDashboard).catch(()=>setError("اطلاعات فروش داشبورد کامل دریافت نشد. دوباره تلاش کنید."))};useEffect(load,[month.year,month.month]);const move=delta=>setMonth(v=>{let month=v.month+delta,year=v.year;if(month<1){month=12;year--}if(month>12){month=1;year++}return year>current.year||(year===current.year&&month>current.month)?v:{year,month}});const m=dashboard?.current_month,empty=m&&m.orders_count===0&&m.invoices_count===0&&m.purchases_count===0&&m.returns_count===0;return <main className="min-h-dvh bg-slate-50 p-4 pb-24 sm:p-6"><div className="mx-auto max-w-6xl"><header className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold">سلام، {user.full_name}</h1><p className="mt-1 text-slate-600">نمای کلی فعالیت کسب‌وکار شما</p></div><button className="font-bold text-red-700" onClick={()=>{logout();navigate("/login")}}>خروج</button></header><section className="mb-5 rounded-2xl bg-white p-4 ring-1 ring-slate-200"><p className="text-center text-sm text-slate-500">آمار ماه انتخاب‌شده</p><div className="mt-2 flex items-center justify-between gap-2"><button className="admin-button min-h-11" onClick={()=>move(-1)}>‹ ماه قبل</button><h2 className="text-center text-lg font-black sm:text-xl">{jalaliMonthTitle(month.year,month.month)}</h2><button disabled={isCurrent} className="admin-button min-h-11 disabled:cursor-not-allowed disabled:opacity-40" onClick={()=>move(1)}>ماه بعد ›</button></div>{!isCurrent&&<button className="mx-auto mt-3 block min-h-10 font-bold text-emerald-800" onClick={()=>setMonth(current)}>بازگشت به ماه جاری</button>}</section>{error&&<div className="mb-4 rounded-xl bg-red-50 p-4 text-red-700"><p>{error}</p><button className="admin-button mt-3" onClick={load}>تلاش مجدد</button></div>}{!dashboard&&!error&&<p className="rounded-2xl bg-white p-8 text-center">در حال دریافت آمار…</p>}{empty&&<p className="mb-4 rounded-xl bg-sky-50 p-4 text-center text-sky-800">در این ماه هنوز فعالیتی ثبت نشده است. اطلاعات ماه‌های قبل محفوظ است.</p>}{m&&<section className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[["فروش",m.sales_total],["خرید",m.purchase_total],["مرجوعی",m.return_total],["فروش خالص",m.net_sales]].map(([label,value])=><article className="rounded-2xl bg-white p-4 ring-1 ring-slate-200" key={label}><p className="text-sm text-slate-500">{label} {jalaliMonthTitle(month.year,month.month)}</p><p className="mt-2 text-lg font-bold text-teal-800">{formatPrice(value)}</p></article>)}<button className="rounded-2xl bg-white p-4 text-right ring-1 ring-slate-200" onClick={()=>navigate("/orders")}><p className="text-sm text-slate-500">تعداد سفارش‌ها</p><p className="mt-2 text-2xl font-bold">{new Intl.NumberFormat("fa-IR").format(m.orders_count)}</p></button><article className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"><p className="text-sm text-slate-500">تعداد فاکتورها</p><p className="mt-2 text-2xl font-bold">{new Intl.NumberFormat("fa-IR").format(m.invoices_count)}</p></article></section>}<section className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-slate-200"><h2 className="text-lg font-bold">دسترسی سریع</h2><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{[["گزارش‌ها","/reports"],["موجودی","/inventory"],["فاکتورها","/invoices"],["مرجوعی‌ها","/returns"],["فروشنده‌ها","/companies"],["خریدها","/purchases"],["سفارش‌ها","/orders"],["مشتری‌ها","/customers"],["محصولات","/products"],["حساب کاربری","/account/profile"]].map(([label,url])=><button className="min-h-12 rounded-xl bg-teal-700 px-4 font-semibold text-white" key={url} onClick={()=>navigate(url)}>{label}</button>)}</div></section></div><MobileNav/></main>}
+import { useEffect, useState } from "react";
+import AppShell from "../components/AppShell";
+import { Badge, Button, Card, Icon, StatePanel } from "../components/ui";
+import { navigate } from "../hooks/useRoute";
+import { useAuth } from "../services/AuthContext";
+import { gregorianToJalali, jalaliMonthRange, jalaliMonthTitle, todayIso } from "../services/jalali";
+import { formatPrice } from "../services/products";
+import { getDashboard } from "../services/reports";
+
+const current = gregorianToJalali(todayIso());
+const number = (value) => new Intl.NumberFormat("fa-IR").format(value || 0);
+
+function validateDashboard(data) {
+  const month = data?.current_month;
+  if ([month?.sales_total, month?.net_sales, month?.orders_count].some((value) => value == null)) throw new Error();
+  return data;
+}
+
+const MetricCard = ({ label, value, tone = "brand", hint }) => (
+  <Card className="dashboard-metric">
+    <div className={`metric-mark metric-mark--${tone}`} aria-hidden="true" />
+    <p className="ui-eyebrow">{label}</p>
+    <p className="metric-value">{formatPrice(value)}</p>
+    <p className="metric-hint">{hint}</p>
+  </Card>
+);
+
+export default function HomePage() {
+  const { user } = useAuth();
+  const [month, setMonth] = useState({ year: current.year, month: current.month });
+  const [dashboard, setDashboard] = useState();
+  const [error, setError] = useState("");
+  const range = jalaliMonthRange(month.year, month.month);
+  const isCurrent = month.year === current.year && month.month === current.month;
+
+  const load = () => {
+    setError("");
+    setDashboard();
+    getDashboard(range.from, range.to)
+      .then(validateDashboard)
+      .then(setDashboard)
+      .catch(() => setError("اطلاعات فروش داشبورد کامل دریافت نشد. دوباره تلاش کنید."));
+  };
+
+  useEffect(load, [month.year, month.month]);
+
+  const move = (delta) => setMonth((value) => {
+    let nextMonth = value.month + delta;
+    let year = value.year;
+    if (nextMonth < 1) { nextMonth = 12; year -= 1; }
+    if (nextMonth > 12) { nextMonth = 1; year += 1; }
+    return year > current.year || (year === current.year && nextMonth > current.month)
+      ? value
+      : { year, month: nextMonth };
+  });
+
+  const metrics = dashboard?.current_month;
+  const empty = metrics && ["orders_count", "invoices_count", "purchases_count", "returns_count"]
+    .every((key) => metrics[key] === 0);
+
+  return (
+    <AppShell
+      title="داشبورد"
+      subtitle="تصویر روشن از وضعیت کسب‌وکار شما"
+      action={<Button onClick={() => navigate("/customers")}><Icon name="plus" /> ثبت فروش جدید</Button>}
+    >
+      <section className="dashboard-welcome">
+        <div>
+          <Badge tone="brand">امروز در کسب‌وکار شما</Badge>
+          <h2>سلام {user?.full_name || "همراه عزیز"}</h2>
+          <p>فروش، خرید و فعالیت‌های ماه را سریع مرور کنید و کار بعدی را شروع کنید.</p>
+        </div>
+        <div className="dashboard-month" aria-label="انتخاب ماه گزارش">
+          <Button variant="secondary" onClick={() => move(-1)}>ماه قبل</Button>
+          <div><span>گزارش ماه</span><strong>{jalaliMonthTitle(month.year, month.month)}</strong></div>
+          <Button variant="secondary" disabled={isCurrent} onClick={() => move(1)}>ماه بعد</Button>
+          {!isCurrent && <button className="month-current" onClick={() => setMonth(current)}>بازگشت به ماه جاری</button>}
+        </div>
+      </section>
+
+      {error && <StatePanel type="error" title="دریافت گزارش ناموفق بود" description={error} action={<Button onClick={load}>تلاش مجدد</Button>} />}
+      {!dashboard && !error && <StatePanel title="در حال آماده‌سازی گزارش" description="چند لحظه صبر کنید…" />}
+      {empty && <StatePanel title="این ماه هنوز فعالیتی ثبت نشده است" description="اطلاعات ماه‌های قبل محفوظ است و می‌توانید از بالای صفحه ماه را تغییر دهید." />}
+
+      {metrics && <>
+        <section className="dashboard-metrics" aria-label="شاخص‌های مالی">
+          <MetricCard label="فروش" value={metrics.sales_total} hint="مجموع فروش ثبت‌شده" />
+          <MetricCard label="فروش خالص" value={metrics.net_sales} tone="success" hint="پس از کسر مرجوعی" />
+          <MetricCard label="خرید" value={metrics.purchase_total} tone="neutral" hint="مجموع خرید ثبت‌شده" />
+          <MetricCard label="مرجوعی" value={metrics.return_total} tone="warning" hint="ارزش اقلام برگشتی" />
+        </section>
+
+        <section className="dashboard-grid">
+          <Card className="activity-card">
+            <div className="section-heading"><div><p className="ui-eyebrow">فعالیت این ماه</p><h2>جریان اسناد</h2></div><Badge>{jalaliMonthTitle(month.year, month.month)}</Badge></div>
+            <div className="activity-list">
+              {[
+                ["سفارش‌ها", "orders", metrics.orders_count, "/orders"],
+                ["فاکتورها", "invoice", metrics.invoices_count, "/invoices"],
+                ["خریدها", "box", metrics.purchases_count, "/purchases"],
+                ["مرجوعی‌ها", "back", metrics.returns_count, "/returns"],
+              ].map(([label, icon, value, path]) => <button key={path} onClick={() => navigate(path)}><span className="activity-icon"><Icon name={icon} /></span><span>{label}</span><strong>{number(value)}</strong></button>)}
+            </div>
+          </Card>
+
+          <Card className="quick-actions">
+            <div className="section-heading"><div><p className="ui-eyebrow">دسترسی سریع</p><h2>کارهای پرکاربرد</h2></div></div>
+            <div className="quick-action-grid">
+              {[
+                ["مشتری جدید", "users", "/customers/new"],
+                ["محصول جدید", "box", "/products/new"],
+                ["مشاهده موجودی", "chart", "/inventory"],
+                ["گزارش‌ها", "chart", "/reports"],
+                ["پشتیبانی", "support", "/support"],
+              ].map(([label, icon, path]) => <button key={path} onClick={() => navigate(path)}><Icon name={icon} /><span>{label}</span></button>)}
+            </div>
+          </Card>
+        </section>
+      </>}
+    </AppShell>
+  );
+}
