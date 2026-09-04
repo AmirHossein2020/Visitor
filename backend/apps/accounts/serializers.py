@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
+from .normalization import normalize_phone
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -23,6 +24,9 @@ class ProfileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("نام و نام خانوادگی الزامی است.")
         return value.strip()
 
+    def validate_phone_number(self, value):
+        return normalize_phone(value)
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
@@ -38,6 +42,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         if User.objects.filter(email__iexact=email).exists():
             raise serializers.ValidationError("کاربری با این ایمیل وجود دارد.")
         return email
+
+    def validate_phone_number(self, value):
+        return normalize_phone(value)
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:

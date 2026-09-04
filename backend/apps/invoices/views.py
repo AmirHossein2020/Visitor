@@ -4,6 +4,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import DecimalField, Prefetch, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
+from django.core.files.base import ContentFile
+from pathlib import Path
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from apps.subscriptions.permissions import HasActiveSubscription
@@ -126,6 +128,16 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     final_amount=final_amount,
                     notes=data["notes"],
                 )
+                if data["include_stamp"] and seller.stamp_image:
+                    seller.stamp_image.open("rb")
+                    invoice.stamp_snapshot.save(Path(seller.stamp_image.name).name, ContentFile(seller.stamp_image.read()), save=False)
+                    seller.stamp_image.close()
+                if data["include_signature"] and seller.signature_image:
+                    seller.signature_image.open("rb")
+                    invoice.signature_snapshot.save(Path(seller.signature_image.name).name, ContentFile(seller.signature_image.read()), save=False)
+                    seller.signature_image.close()
+                if invoice.stamp_snapshot or invoice.signature_snapshot:
+                    invoice.save(update_fields=("stamp_snapshot", "signature_snapshot", "updated_at"))
                 InvoiceItem.objects.bulk_create([
                     InvoiceItem(
                         invoice=invoice,

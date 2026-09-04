@@ -1,6 +1,9 @@
 import re
+from io import BytesIO
 from decimal import Decimal
 from unittest.mock import patch
+from django.core.files.uploadedfile import SimpleUploadedFile
+from PIL import Image
 from django.utils import timezone
 
 from rest_framework import status
@@ -59,6 +62,12 @@ class InvoiceAPITests(APITestCase):
                 unit_price=Decimal("100"),
             )
         self.order.recalculate_total()
+
+    @staticmethod
+    def image(name="asset.png", color=(180, 0, 0, 140)):
+        output = BytesIO()
+        Image.new("RGBA", (180, 100), color).save(output, format="PNG")
+        return SimpleUploadedFile(name, output.getvalue(), content_type="image/png")
 
     @staticmethod
     def pdf_page_count(content):
@@ -334,6 +343,50 @@ class InvoiceAPITests(APITestCase):
         response = self.client.get(f"{self.list_url}{invoice_id}/pdf/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreater(len(response.content), 1000)
+
+
+    def test_stamp_and_signature_are_optional_per_invoice_and_immutable(self):
+        self.seller.stamp_image = self.image("stamp.png")
+        self.seller.signature_image = self.image("signature.png", (0, 0, 120, 180))
+        self.seller.save()
+        self.authenticate()
+        unsigned = Invoice.objects.get(pk=self.issue().data["id"])
+        self.assertFalse(unsigned.stamp_snapshot); self.assertFalse(unsigned.signature_snapshot)
+        second_order = self.create_order()
+        signed = Invoice.objects.get(pk=self.issue(order=second_order, include_stamp=True, include_signature=True).data["id"])
+        self.assertTrue(signed.stamp_snapshot); self.assertTrue(signed.signature_snapshot)
+        signed.stamp_snapshot.open("rb"); original = signed.stamp_snapshot.read(); signed.stamp_snapshot.close()
+        self.seller.stamp_image = self.image("new-stamp.png", (0, 180, 0, 160)); self.seller.save()
+        signed.refresh_from_db(); signed.stamp_snapshot.open("rb")
+        self.assertEqual(signed.stamp_snapshot.read(), original); signed.stamp_snapshot.close()
+
+    def test_revision_takes_an_independent_current_asset_snapshot(self):
+        self.seller.stamp_image = self.image("first.png"); self.seller.save()
+        self.authenticate(); first = Invoice.objects.get(pk=self.issue(include_stamp=True).data["id"])
+        item = self.order.items.get()
+        self.client.patch(f"/api/orders/{self.order.id}/items/{item.id}/", {"quantity": "3"}, format="json")
+        self.seller.stamp_image = self.image("second.png", (0, 180, 0, 160)); self.seller.save()
+        second = Invoice.objects.get(pk=self.issue(include_stamp=True).data["id"])
+        first.stamp_snapshot.open("rb"); first_bytes = first.stamp_snapshot.read(); first.stamp_snapshot.close()
+        second.stamp_snapshot.open("rb"); second_bytes = second.stamp_snapshot.read(); second.stamp_snapshot.close()
+        self.assertNotEqual(first_bytes, second_bytes)
+
+    def test_pdf_with_stamp_and_signature_is_valid_and_one_item_stays_one_page(self):
+        self.seller.stamp_image = self.image("stamp.png"); self.seller.signature_image = self.image("signature.png"); self.seller.save()
+        self.authenticate(); invoice_id = self.issue(include_stamp=True, include_signature=True).data["id"]
+        response = self.client.get(f"{self.list_url}{invoice_id}/pdf/")
+        self.assertTrue(response.content.startswith(b"%PDF")); self.assertEqual(self.pdf_page_count(response.content), 1)
+
+    def test_stamp_only_and_signature_only_follow_independent_flags(self):
+        self.seller.stamp_image = self.image("stamp.png"); self.seller.signature_image = self.image("signature.png"); self.seller.save()
+        self.authenticate()
+        stamp_only = Invoice.objects.get(pk=self.issue(order=self.create_order(), include_stamp=True, include_signature=False).data["id"])
+        signature_only = Invoice.objects.get(pk=self.issue(order=self.create_order(), include_stamp=False, include_signature=True).data["id"])
+        self.assertTrue(stamp_only.stamp_snapshot); self.assertFalse(stamp_only.signature_snapshot)
+        self.assertFalse(signature_only.stamp_snapshot); self.assertTrue(signature_only.signature_snapshot)
+        for invoice in (stamp_only, signature_only):
+            response = self.client.get(f"{self.list_url}{invoice.id}/pdf/")
+            self.assertTrue(response.content.startswith(b"%PDF"))
 
 
 class EndToEndBusinessScenarioTests(APITestCase):

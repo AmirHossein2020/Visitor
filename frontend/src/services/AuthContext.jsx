@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiRequest, clearTokens, hasAccessToken, saveTokens } from "./api";
+import { normalizePhone } from "./normalization";
 
 const AuthContext = createContext(null);
 
@@ -40,7 +41,7 @@ export function AuthProvider({ children }) {
 
   const register = useCallback((details) => apiRequest("/auth/register/", {
     method: "POST",
-    body: JSON.stringify(details),
+    body: JSON.stringify({ ...details, phone_number: normalizePhone(details.phone_number) }),
   }), []);
 
   const logout = useCallback(() => {

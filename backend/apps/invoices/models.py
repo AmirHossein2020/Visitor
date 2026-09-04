@@ -5,6 +5,12 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from uuid import uuid4
+from pathlib import Path
+
+
+def invoice_asset_path(instance, filename):
+    return f"invoice-assets/{instance.owner_id}/{instance.pk}/{uuid4().hex}{Path(filename).suffix.lower()}"
 
 
 class Invoice(models.Model):
@@ -33,6 +39,8 @@ class Invoice(models.Model):
     seller_national_id = models.CharField(max_length=30, blank=True)
     seller_registration_number = models.CharField(max_length=30, blank=True)
     seller_postal_code = models.CharField(max_length=20, blank=True)
+    stamp_snapshot = models.FileField(upload_to=invoice_asset_path, blank=True)
+    signature_snapshot = models.FileField(upload_to=invoice_asset_path, blank=True)
 
     buyer_name = models.CharField(max_length=200)
     buyer_company_name = models.CharField(max_length=200, blank=True)

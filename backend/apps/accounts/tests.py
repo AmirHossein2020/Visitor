@@ -35,6 +35,14 @@ class AuthenticationAPITests(APITestCase):
         response = self.client.post(self.register_url, self.valid_payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_email_is_case_insensitively_unique_and_phone_digits_are_normalized(self):
+        first = self.client.post(self.register_url, {**self.valid_payload, "email": " Test@Example.com ", "phone_number": "۰۹۱۲۱۲۳۴۵۶۷"}, format="json")
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email="test@example.com")
+        self.assertEqual(user.phone_number, "09121234567")
+        duplicate = self.client.post(self.register_url, {**self.valid_payload, "email": "TEST@example.COM", "phone_number": "٠٩١٢١٢٣٤٥٦٧"}, format="json")
+        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_password_mismatch_rejected(self):
         payload = {**self.valid_payload, "password_confirm": "DifferentPass!2026"}
         response = self.client.post(self.register_url, payload, format="json")

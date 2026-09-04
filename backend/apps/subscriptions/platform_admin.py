@@ -66,7 +66,7 @@ class AdminSubscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserSubscription
-        fields = ("id", "user", "user_email", "plan", "plan_name", "status", "effective_status", "starts_at", "expires_at", "approved_at", "approved_by_email", "created_at")
+        fields = ("id", "user", "user_email", "plan", "plan_name", "status", "effective_status", "source", "starts_at", "expires_at", "approved_at", "approved_by_email", "created_at")
         read_only_fields = fields
 
 
@@ -98,7 +98,7 @@ class AdminUserListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "email", "full_name", "date_joined", "last_login", "is_active", "is_staff", "is_superuser", "role", "subscription_status", "active_plan", "subscription_expires_at")
+        fields = ("id", "email", "full_name", "date_joined", "last_login", "is_active", "is_staff", "is_superuser", "role", "subscription_status", "active_plan", "subscription_expires_at", "trial_used_at")
         read_only_fields = fields
 
     def _subscription(self, obj):
@@ -129,7 +129,7 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "email", "full_name", "phone_number", "date_joined", "last_login", "is_active", "is_staff", "is_superuser", "role", "subscriptions", "subscription_orders", "payments")
+        fields = ("id", "email", "full_name", "phone_number", "date_joined", "last_login", "is_active", "is_staff", "is_superuser", "role", "trial_used_at", "subscriptions", "subscription_orders", "payments")
         read_only_fields = fields
 
     def get_payments(self, obj):
@@ -301,7 +301,7 @@ class AdminUserViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
             return Response({"detail": "پلن فعال معتبر انتخاب کنید."}, status=400)
         now = timezone.now()
         UserSubscription.objects.filter(user=user, status="active").update(status="cancelled")
-        subscription = UserSubscription.objects.create(user=user, plan=plan, status="active", starts_at=now, expires_at=now + timedelta(days=plan.duration_days), approved_at=now, approved_by=request.user)
+        subscription = UserSubscription.objects.create(user=user, plan=plan, status="active", source=UserSubscription.Source.MANUAL, starts_at=now, expires_at=now + timedelta(days=plan.duration_days), approved_at=now, approved_by=request.user)
         audit(request.user, "subscription_activated", subscription, after={"plan_id": plan.id, "expires_at": subscription.expires_at.isoformat()})
         return Response(AdminSubscriptionSerializer(subscription).data, status=201)
 

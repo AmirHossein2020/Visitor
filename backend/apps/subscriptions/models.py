@@ -41,6 +41,11 @@ class SubscriptionPlan(models.Model):
 
 
 class UserSubscription(models.Model):
+    class Source(models.TextChoices):
+        PAID = "paid", "اشتراک پولی"
+        FREE_TRIAL = "free_trial", "آزمایش رایگان"
+        MANUAL = "manual", "فعال‌سازی دستی"
+
     class Status(models.TextChoices):
         PENDING = "pending", "در انتظار تأیید"
         ACTIVE = "active", "فعال"
@@ -51,6 +56,7 @@ class UserSubscription(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscriptions")
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT, related_name="subscriptions")
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    source = models.CharField(max_length=12, choices=Source.choices, default=Source.PAID)
     starts_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     approved_at = models.DateTimeField(null=True, blank=True)

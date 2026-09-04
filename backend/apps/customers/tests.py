@@ -122,3 +122,10 @@ class CustomerAPITests(APITestCase):
                 response = self.client.post(self.list_url, payload, format="json")
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(Customer.objects.exists())
+
+    def test_persian_and_arabic_phone_digits_are_normalized(self):
+        self.authenticate()
+        for phone in ("۰۹۱۲۱۲۳۴۵۶۷", "٠٩١٢١٢٣٤٥٦٧"):
+            response = self.client.post(self.list_url, {**self.payload, "name": phone, "phone_number": phone}, format="json")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data["phone_number"], "09121234567")

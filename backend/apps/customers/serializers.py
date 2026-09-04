@@ -1,9 +1,16 @@
 from rest_framework import serializers
 
 from .models import Customer
+from apps.accounts.normalization import normalize_phone
 
 
 class CustomerSerializer(serializers.ModelSerializer):
+    def to_internal_value(self, data):
+        data = data.copy()
+        if "phone_number" in data:
+            data["phone_number"] = normalize_phone(data["phone_number"])
+        return super().to_internal_value(data)
+
     class Meta:
         model = Customer
         fields = (
@@ -41,3 +48,6 @@ class CustomerSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("نام مشتری الزامی است.")
         return value
+
+    def validate_phone_number(self, value):
+        return normalize_phone(value)

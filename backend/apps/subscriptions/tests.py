@@ -78,6 +78,40 @@ class SubscriptionAPITests(APITestCase):
         self.assertEqual(self.client.post("/api/auth/register/", {"email": "new@example.com", "full_name": "کاربر جدید", "password": "StrongPass!2026", "password_confirm": "StrongPass!2026"}, format="json").status_code, 201)
         self.authenticate()
         self.assertEqual(self.client.get("/api/subscriptions/me/").status_code, 200)
+
+    def test_eligible_user_activates_exactly_one_24_hour_trial_with_access_and_audit(self):
+        self.authenticate()
+        before = timezone.now()
+        response = self.client.post("/api/subscriptions/trial/activate/")
+        self.assertEqual(response.status_code, 201)
+        subscription = UserSubscription.objects.get(user=self.user)
+        self.assertEqual(subscription.source, UserSubscription.Source.FREE_TRIAL)
+        self.assertEqual(subscription.expires_at - subscription.starts_at, timedelta(hours=24))
+        self.assertGreaterEqual(subscription.starts_at, before)
+        self.assertEqual(self.client.get("/api/products/").status_code, 200)
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.trial_used_at)
+        self.assertTrue(PlatformAdminAuditLog.objects.filter(action="free_trial_activated", target_id=str(subscription.id)).exists())
+        self.assertFalse(SubscriptionOrder.objects.filter(user=self.user).exists())
+        self.assertFalse(SubscriptionPayment.objects.filter(user=self.user).exists())
+        self.assertEqual(self.client.post("/api/subscriptions/trial/activate/").status_code, 400)
+
+    def test_expired_or_cancelled_trial_never_restores_eligibility(self):
+        self.authenticate()
+        self.client.post("/api/subscriptions/trial/activate/")
+        subscription = UserSubscription.objects.get(user=self.user)
+        subscription.status = UserSubscription.Status.CANCELLED
+        subscription.save(update_fields=("status",))
+        self.assertEqual(self.client.post("/api/subscriptions/trial/activate/").status_code, 400)
+        self.assertFalse(self.client.get("/api/subscriptions/me/").data["trial_eligible"])
+
+    def test_active_and_previously_paid_users_are_not_trial_eligible(self):
+        self.activate()
+        self.authenticate()
+        self.assertEqual(self.client.post("/api/subscriptions/trial/activate/").status_code, 400)
+        UserSubscription.objects.all().delete()
+        SubscriptionOrder.objects.create(user=self.user, plan=self.monthly, amount_snapshot=self.monthly.price, status=SubscriptionOrder.Status.APPROVED)
+        self.assertEqual(self.client.post("/api/subscriptions/trial/activate/").status_code, 400)
         self.assertEqual(self.client.get("/api/subscriptions/orders/").status_code, 200)
 
     def test_approval_activates_subscription_and_preserves_business_data_after_expiration(self):

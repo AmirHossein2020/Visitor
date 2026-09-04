@@ -1,5 +1,6 @@
 import { useState } from "react";
 import FormField from "./FormField";
+import { normalizePhone } from "../services/normalization";
 
 const emptyCustomer = {
   name: "", phone_number: "", company_name: "", address: "",
@@ -15,10 +16,11 @@ export default function CustomerForm({ initialValue = emptyCustomer, onSubmit, s
     event.preventDefault();
     setError("");
     if (!form.name.trim()) return setError("نام مشتری الزامی است.");
-    if (form.phone_number && !/^[0-9+()\-\s]{7,25}$/.test(form.phone_number)) return setError("شماره تماس واردشده معتبر نیست.");
+    const normalized = { ...form, phone_number: normalizePhone(form.phone_number) };
+    if (normalized.phone_number && !/^[0-9+()\-\s]{7,25}$/.test(normalized.phone_number)) return setError("شماره تماس واردشده معتبر نیست.");
     setIsSubmitting(true);
     try {
-      await onSubmit(form);
+      await onSubmit(normalized);
     } catch (message) {
       setError(typeof message === "string" ? message : "ثبت اطلاعات انجام نشد.");
     } finally {

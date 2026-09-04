@@ -1,5 +1,8 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from io import BytesIO
+from PIL import Image, ImageDraw
 
 from apps.accounts.models import User
 from apps.customers.models import Customer
@@ -34,6 +37,13 @@ class SellerProfileAPITests(APITestCase):
         data = {"name": "شرکت سپید", **overrides}
         return SellerProfile.objects.create(owner=owner or self.user, **data)
 
+    @staticmethod
+    def image(name="asset.png", size=(120, 80)):
+        source = Image.new("RGB", size, "white")
+        ImageDraw.Draw(source).ellipse((30, 15, 90, 65), outline=(0, 90, 180), width=4)
+        output = BytesIO(); source.save(output, format="PNG")
+        return SimpleUploadedFile(name, output.getvalue(), content_type="image/png")
+
     def test_create_own_seller_profile(self):
         self.authenticate()
         response = self.client.post(self.list_url, self.payload, format="json")
@@ -45,6 +55,12 @@ class SellerProfileAPITests(APITestCase):
         response = self.client.post(self.list_url, {"name": "فروشنده مستقل"}, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["phone_number"], "")
+
+    def test_persian_phone_digits_are_normalized(self):
+        self.authenticate()
+        response = self.client.post(self.list_url, {"name": "فروشنده", "phone_number": "۰۲۱-۸۸۷۷۶۶۵۵"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["phone_number"], "021-88776655")
 
     def test_list_only_own_profiles(self):
         own = self.create_profile()
@@ -96,3 +112,31 @@ class SellerProfileAPITests(APITestCase):
                     if getattr(getattr(field, "remote_field", None), "model", None) is SellerProfile
                 ]
                 self.assertEqual(references, [])
+
+    def test_optional_stamp_signature_upload_preview_replace_and_remove(self):
+        profile = self.create_profile(); self.authenticate()
+        response = self.client.patch(f"{self.list_url}{profile.id}/", {"stamp_image": self.image(), "signature_image": self.image("signature.png")}, format="multipart")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["has_stamp"]); self.assertTrue(response.data["has_signature"])
+        profile.refresh_from_db()
+        self.assertTrue(profile.stamp_image.name.endswith(".png"))
+        profile.stamp_image.open("rb")
+        processed = Image.open(profile.stamp_image)
+        self.assertEqual(processed.format, "PNG")
+        self.assertEqual(processed.mode, "RGBA")
+        self.assertLess(processed.width, 120)
+        self.assertLess(processed.height, 80)
+        profile.stamp_image.close()
+        self.assertEqual(self.client.get(f"{self.list_url}{profile.id}/stamp/").status_code, 200)
+        self.assertEqual(self.client.patch(f"{self.list_url}{profile.id}/", {"stamp_image": self.image("replacement.png")}, format="multipart").status_code, 200)
+        self.assertEqual(self.client.delete(f"{self.list_url}{profile.id}/stamp/").status_code, 204)
+        profile.refresh_from_db(); self.assertFalse(profile.stamp_image); self.assertTrue(profile.signature_image)
+
+    def test_asset_validation_and_owner_isolation(self):
+        profile = self.create_profile(); self.authenticate()
+        invalid = SimpleUploadedFile("asset.svg", b"<svg><script/></svg>", content_type="image/svg+xml")
+        self.assertEqual(self.client.patch(f"{self.list_url}{profile.id}/", {"stamp_image": invalid}, format="multipart").status_code, 400)
+        oversized = SimpleUploadedFile("large.png", b"\x89PNG\r\n\x1a\n" + b"0" * (3 * 1024 * 1024 + 1), content_type="image/png")
+        self.assertEqual(self.client.patch(f"{self.list_url}{profile.id}/", {"stamp_image": oversized}, format="multipart").status_code, 400)
+        self.client.force_authenticate(self.other_user)
+        self.assertEqual(self.client.get(f"{self.list_url}{profile.id}/signature/").status_code, 404)

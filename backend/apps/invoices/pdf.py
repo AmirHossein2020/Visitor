@@ -10,6 +10,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
@@ -20,12 +21,33 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
+    Flowable,
 )
 
 
 FONT_DIR = Path(__file__).resolve().parent / "assets" / "fonts"
 FONT_NAME = "InvoiceDejaVu"
 FONT_BOLD = "InvoiceDejaVuBold"
+
+
+class SellerAssets(Flowable):
+    def __init__(self, stamp=None, signature=None):
+        super().__init__(); self.width = 90 * mm; self.height = 23 * mm
+        self.stamp, self.signature = stamp, signature
+
+    def _draw(self, asset, x, y, max_width, max_height):
+        if not asset: return
+        asset.open("rb")
+        reader = ImageReader(asset)
+        width, height = reader.getSize()
+        scale = min(max_width / width, max_height / height)
+        draw_width, draw_height = width * scale, height * scale
+        self.canv.drawImage(reader, x, y + (max_height - draw_height) / 2, draw_width, draw_height, preserveAspectRatio=True, mask="auto")
+        asset.close()
+
+    def draw(self):
+        self._draw(self.signature, 25 * mm, 2 * mm, 52 * mm, 17 * mm)
+        self._draw(self.stamp, 5 * mm, 0, 40 * mm, 22 * mm)
 
 
 def register_fonts():
@@ -261,10 +283,10 @@ def build_invoice_pdf(invoice):
             Table([[shaped_paragraph(invoice.notes, styles["value"], 90)]], colWidths=[180 * mm], style=TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.black), ("PADDING", (0, 0), (-1, -1), 4)])),
         ])
 
-    signatures = Table([[
-        Paragraph(fa("مهر و امضای خریدار"), styles["section_title"]),
-        Paragraph(fa("مهر و امضای فروشنده"), styles["section_title"]),
-    ]], colWidths=[90 * mm, 90 * mm], rowHeights=[25 * mm])
+    signatures = Table([
+        [Paragraph(fa("مهر و امضای خریدار"), styles["section_title"]), Paragraph(fa("مهر و امضای فروشنده"), styles["section_title"])],
+        ["", SellerAssets(invoice.stamp_snapshot, invoice.signature_snapshot)],
+    ], colWidths=[90 * mm, 90 * mm], rowHeights=[7 * mm, 23 * mm])
     signatures.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.8, colors.black), ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 5)]))
     ending.extend([Spacer(1, 3 * mm), signatures])
 

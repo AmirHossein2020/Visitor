@@ -21,15 +21,21 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
     effective_status = serializers.CharField(read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     days_remaining = serializers.SerializerMethodField()
+    hours_remaining = serializers.SerializerMethodField()
 
     class Meta:
         model = UserSubscription
-        fields = ("id", "plan", "status", "effective_status", "status_display", "starts_at", "expires_at", "days_remaining")
+        fields = ("id", "plan", "status", "effective_status", "status_display", "source", "starts_at", "expires_at", "days_remaining", "hours_remaining")
 
     def get_days_remaining(self, obj):
         if not obj.is_effective:
             return 0
         return max(0, (obj.expires_at - timezone.now()).days)
+
+    def get_hours_remaining(self, obj):
+        if not obj.is_effective:
+            return 0
+        return max(0, int((obj.expires_at - timezone.now()).total_seconds() // 3600))
 
 
 class SubscriptionOrderSerializer(serializers.ModelSerializer):

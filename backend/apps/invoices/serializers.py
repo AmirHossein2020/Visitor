@@ -44,6 +44,8 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
     is_active = serializers.SerializerMethodField()
     previous_invoice = serializers.SerializerMethodField()
     replacement_invoice = serializers.SerializerMethodField()
+    has_stamp = serializers.SerializerMethodField()
+    has_signature = serializers.SerializerMethodField()
 
     @staticmethod
     def _link(invoice):
@@ -69,6 +71,9 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
             revision_of=root, revision_number=obj.revision_number + 1,
         ).first())
 
+    def get_has_stamp(self, obj): return bool(obj.stamp_snapshot)
+    def get_has_signature(self, obj): return bool(obj.signature_snapshot)
+
     class Meta:
         model = Invoice
         fields = (
@@ -81,7 +86,7 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
             "buyer_name", "buyer_company_name", "buyer_phone_number",
             "buyer_address", "buyer_economic_code", "buyer_postal_code",
             "subtotal", "discount_amount", "tax_amount", "duties_amount",
-            "final_amount", "notes", "items", "created_at", "updated_at",
+            "final_amount", "notes", "has_stamp", "has_signature", "items", "created_at", "updated_at",
         )
         read_only_fields = (
             "id", "invoice_number", "status", "status_display", "issued_at",
@@ -104,3 +109,5 @@ class IssueInvoiceSerializer(serializers.Serializer):
     tax_amount = serializers.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0"), default=Decimal("0"))
     duties_amount = serializers.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0"), default=Decimal("0"))
     notes = serializers.CharField(required=False, allow_blank=True, default="")
+    include_stamp = serializers.BooleanField(required=False, default=False)
+    include_signature = serializers.BooleanField(required=False, default=False)

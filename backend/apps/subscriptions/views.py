@@ -1,12 +1,17 @@
 from pathlib import Path
 
+from datetime import timedelta
+
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.http import FileResponse
+from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import PlatformSettings, SubscriptionOrder, SubscriptionPayment, SubscriptionPlan
+from .models import PlatformAdminAuditLog, PlatformSettings, SubscriptionOrder, SubscriptionPayment, SubscriptionPlan, UserSubscription
 from .permissions import active_subscription_for
 from .serializers import SubscriptionOrderSerializer, SubscriptionPaymentSerializer, SubscriptionPlanSerializer, UserSubscriptionSerializer
 
@@ -21,11 +26,55 @@ class MySubscriptionView(generics.GenericAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
+        request.user.refresh_from_db(fields=("trial_used_at",))
         effective = active_subscription_for(request.user)
         if effective is True:
             return Response({"is_active": True, "is_staff": request.user.is_staff, "is_superuser": request.user.is_superuser, "subscription": None})
         latest = request.user.subscriptions.select_related("plan").first()
-        return Response({"is_active": bool(effective), "is_staff": False, "is_superuser": False, "subscription": UserSubscriptionSerializer(latest).data if latest else None})
+        previously_paid = request.user.subscription_orders.filter(status=SubscriptionOrder.Status.APPROVED).exists()
+        return Response({
+            "is_active": bool(effective), "is_staff": False, "is_superuser": False,
+            "subscription": UserSubscriptionSerializer(latest).data if latest else None,
+            "trial_used_at": request.user.trial_used_at,
+            "trial_eligible": not request.user.trial_used_at and not effective and not previously_paid,
+        })
+
+
+class ActivateTrialView(generics.GenericAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    @transaction.atomic
+    def post(self, request):
+        user = get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        if user.trial_used_at:
+            return Response({"detail": "آزمایش رایگان قبلاً استفاده شده است."}, status=400)
+        if active_subscription_for(user):
+            return Response({"detail": "در حال حاضر اشتراک فعال دارید."}, status=400)
+        if user.subscription_orders.filter(status=SubscriptionOrder.Status.APPROVED).exists():
+            return Response({"detail": "آزمایش رایگان فقط برای کاربران بدون سابقه اشتراک پولی ارائه می‌شود."}, status=400)
+
+        now = timezone.now()
+        trial_plan, _ = SubscriptionPlan.objects.get_or_create(
+            slug="free-trial",
+            defaults={
+                "name": "آزمایش رایگان یک‌روزه", "billing_period": SubscriptionPlan.BillingPeriod.MONTHLY,
+                "duration_days": 1, "price": 0, "is_active": False,
+                "description": "دسترسی آزمایشی رایگان ۲۴ ساعته",
+            },
+        )
+        user.trial_used_at = now
+        user.save(update_fields=("trial_used_at",))
+        subscription = UserSubscription.objects.create(
+            user=user, plan=trial_plan, status=UserSubscription.Status.ACTIVE,
+            source=UserSubscription.Source.FREE_TRIAL, starts_at=now,
+            expires_at=now + timedelta(hours=24), approved_at=now,
+        )
+        PlatformAdminAuditLog.objects.create(
+            actor=user, action="free_trial_activated", target_type="UserSubscription",
+            target_id=str(subscription.pk), target_display=str(user),
+            after_snapshot={"source": "free_trial", "activated_at": now.isoformat(), "expires_at": subscription.expires_at.isoformat()},
+        )
+        return Response(UserSubscriptionSerializer(subscription).data, status=status.HTTP_201_CREATED)
 
 
 class SubscriptionOrderViewSet(viewsets.ModelViewSet):
