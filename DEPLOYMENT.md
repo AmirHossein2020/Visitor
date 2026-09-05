@@ -44,7 +44,7 @@ python manage.py collectstatic --noinput
 python manage.py check --deploy
 ```
 
-Serve `backend/staticfiles/` through the reverse proxy or platform static-file service. The application currently has no user-uploaded media or invoice-logo storage.
+Serve `backend/staticfiles/` through the reverse proxy or platform static-file service. Keep `backend/media/` private: receipts, support attachments, seller stamps and signatures must only be delivered by their authenticated API endpoints. For scale-out deployments, use private object storage or a shared encrypted volume without changing authorization checks.
 
 ## 5. Processes
 
@@ -70,6 +70,8 @@ pg_dump --format=custom --file=field_sales.dump field_sales
 ```
 
 Keep backups outside the application host and protect them with the same care as production credentials.
+
+Back up private media together with PostgreSQL so database references and files represent the same recovery point. Retain at least 7 daily, 4 weekly and 6 monthly encrypted copies, and test an isolated restore quarterly.
 
 ## 8. Subscription bootstrap
 

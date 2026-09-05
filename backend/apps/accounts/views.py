@@ -6,6 +6,7 @@ from .serializers import LoginSerializer, ProfileSerializer, RegisterSerializer,
 
 
 class RegisterView(generics.CreateAPIView):
+    throttle_scope = "registration"
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
@@ -17,6 +18,7 @@ class RegisterView(generics.CreateAPIView):
 
 
 class LoginView(APIView):
+    throttle_scope = "login"
     permission_classes = (permissions.AllowAny,)
 
     def post(self, request):

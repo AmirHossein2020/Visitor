@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>__SITE_URL__/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>__SITE_URL__/pricing</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
-  <url><loc>__SITE_URL__/login</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
-  <url><loc>__SITE_URL__/register</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>__SITE_URL__/pricing</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>__SITE_URL__/software-visitori</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>__SITE_URL__/sales-order-management</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>__SITE_URL__/sales-invoice</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>__SITE_URL__/field-sales</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>__SITE_URL__/inventory-sales</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>__SITE_URL__/customer-management</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>__SITE_URL__/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>__SITE_URL__/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>__SITE_URL__/contact</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
 </urlset>

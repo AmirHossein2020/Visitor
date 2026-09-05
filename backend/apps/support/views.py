@@ -27,6 +27,7 @@ def add_attachments(message, files):
 
 
 class TicketViewSet(viewsets.ModelViewSet):
+    throttle_scope = "support"
     permission_classes = (permissions.IsAuthenticated,)
     pagination_class = SupportPagination
     http_method_names = ("get", "post", "head", "options")

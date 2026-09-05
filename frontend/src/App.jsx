@@ -21,7 +21,10 @@ const pages = {
   Inventory: lazy(() => import("./pages/InventoryListPage")), InventoryDetail: lazy(() => import("./pages/InventoryDetailPage")), Reports: lazy(() => import("./pages/ReportsPage")),
   Companies: lazy(() => import("./pages/CompanyListPage")), CompanyNew: lazy(() => import("./pages/CompanyCreatePage")), CompanyDetail: lazy(() => import("./pages/CompanyDetailPage")), CompanyEdit: lazy(() => import("./pages/CompanyEditPage")),
   Support: lazy(() => import("./pages/SupportListPage")), SupportNew: lazy(() => import("./pages/SupportCreatePage")), SupportDetail: lazy(() => import("./pages/SupportDetailPage")),
+  PublicContent: lazy(() => import("./pages/PublicContentPage")),
 };
+
+const publicContentPaths = new Set(["/software-visitori", "/sales-order-management", "/sales-invoice", "/field-sales", "/inventory-sales", "/customer-management", "/privacy", "/terms", "/contact"]);
 
 function BusinessGate({ children }) {
   const [state, setState] = useState(null);
@@ -64,11 +67,17 @@ function businessPage(path) {
 function AppRoutes() {
   const path = useRoute(); const { user, isLoading, authError, loadUser } = useAuth();
   const isPlatformAdmin = Boolean(user?.is_staff || user?.is_superuser);
+  useEffect(() => {
+    const publicIndexable = path === "/" || path === "/pricing" || publicContentPaths.has(path);
+    const robots = document.head.querySelector('meta[name="robots"]');
+    if (robots) robots.content = publicIndexable ? "index,follow,max-image-preview:large" : "noindex,nofollow";
+  }, [path]);
   useEffect(() => { if (!isLoading && !user && path.startsWith("/account")) navigate("/login", { replace: true }); }, [user,isLoading,path]);
   if (isLoading) return <main className="grid min-h-dvh place-items-center bg-slate-50">در حال بررسی حساب…</main>;
   if (path.startsWith("/platform-admin") && authError?.status === 0) return <AdminErrorBoundary><AdminUnavailable retry={loadUser}/></AdminErrorBoundary>;
   if (path === "/") return <pages.Landing />;
   if (path === "/pricing") return <pages.Pricing />;
+  if (publicContentPaths.has(path)) return <pages.PublicContent path={path} />;
   if (path === "/register" && !user) return <pages.Register />;
   if (path === "/login" && !user) return <pages.Login />;
   if (["/login","/register","/account/subscription","/account/profile"].includes(path) && isPlatformAdmin) { navigate("/platform-admin", { replace: true }); return null; }
@@ -102,8 +111,7 @@ function AppRoutes() {
     if (!user) { navigate("/login", { replace: true }); return null; }
     return <BusinessGate>{business}</BusinessGate>;
   }
-  if (user) return <pages.Subscription />;
-  return <pages.Landing />;
+  return <main className="public-not-found"><div><span>۴۰۴</span><h1>این صفحه پیدا نشد</h1><p>نشانی واردشده معتبر نیست یا صفحه جابه‌جا شده است.</p><button onClick={() => navigate(user ? "/app" : "/")}>بازگشت به ویزیتورکار</button></div></main>;
 }
 
 export default function App(){return <Suspense fallback={<main className="grid min-h-dvh place-items-center bg-slate-50">در حال بارگذاری…</main>}><AppRoutes /></Suspense>}

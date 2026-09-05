@@ -43,6 +43,7 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", FRONTEND_URL).rstrip("/")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -142,6 +143,8 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", Fals
 SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 if env_bool("USE_X_FORWARDED_PROTO", False):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -150,6 +153,26 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "10000/minute" if "test" in sys.argv else os.getenv("THROTTLE_LOGIN", "10/minute"),
+        "registration": "10000/minute" if "test" in sys.argv else os.getenv("THROTTLE_REGISTRATION", "5/hour"),
+        "trial": "10000/minute" if "test" in sys.argv else os.getenv("THROTTLE_TRIAL", "5/hour"),
+        "support": "10000/minute" if "test" in sys.argv else os.getenv("THROTTLE_SUPPORT", "60/hour"),
+        "payment": "10000/minute" if "test" in sys.argv else os.getenv("THROTTLE_PAYMENT", "30/hour"),
+    },
+}
+
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO")
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"production": {"format": "{asctime} {levelname} {name} {message}", "style": "{"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "production"}},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "django.security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
 }
 
 # Existing automated business tests predate subscriptions. This compatibility

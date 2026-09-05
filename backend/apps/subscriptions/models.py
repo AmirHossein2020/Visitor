@@ -174,7 +174,7 @@ class SubscriptionPayment(models.Model):
 
 
 class PlatformSettings(models.Model):
-    site_name = models.CharField(max_length=100, default="ویزیت‌یار")
+    site_name = models.CharField(max_length=100, default="ویزیتورکار")
     short_description = models.CharField(max_length=300, blank=True)
     manual_payment_enabled = models.BooleanField(default=True)
     account_holder = models.CharField(max_length=150, blank=True)

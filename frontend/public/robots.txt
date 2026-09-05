@@ -2,7 +2,10 @@ User-agent: *
 Allow: /
 Disallow: /app
 Disallow: /account/
+Disallow: /support/
 Disallow: /platform-admin/
 Disallow: /api/
+Disallow: /login
+Disallow: /register
 
 Sitemap: __SITE_URL__/sitemap.xml

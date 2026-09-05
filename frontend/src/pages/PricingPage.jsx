@@ -23,6 +23,13 @@ export default function PricingPage() {
       .finally(() => setLoading(false));
   };
   useEffect(load, [user]);
+  useEffect(() => {
+    const site = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/$/, "");
+    document.title = "تعرفه و آزمایش رایگان ویزیتورکار";
+    document.head.querySelector('meta[name="description"]')?.setAttribute("content", "مشاهده پلن‌های ماهانه و سالانه و شروع آزمایش رایگان ۲۴ ساعته نرم افزار ویزیتوری ویزیتورکار.");
+    document.head.querySelector('link[rel="canonical"]')?.setAttribute("href", `${site}/pricing`);
+    document.head.querySelector('meta[property="og:url"]')?.setAttribute("content", `${site}/pricing`);
+  }, []);
 
   const select = async (id) => {
     if (!user) return navigate("/register");
@@ -39,7 +46,7 @@ export default function PricingPage() {
   };
 
   return <main className="pricing-page">
-    <nav className="public-compact-nav"><button className="brand-lockup public-brand" onClick={() => navigate("/")}><span className="brand-mark">و</span><span><b>ویزیت‌یار</b><small>مدیریت فروش</small></span></button><Button variant="ghost" onClick={() => navigate(user ? "/account/profile" : "/")}>بازگشت</Button></nav>
+    <nav className="public-compact-nav"><button className="brand-lockup public-brand" onClick={() => navigate("/")}><span className="brand-mark">و</span><span><b>ویزیتورکار</b><small>مدیریت فروش</small></span></button><Button variant="ghost" onClick={() => navigate(user ? "/account/profile" : "/")}>بازگشت</Button></nav>
     <div className="pricing-container">
       <header className="pricing-header"><Badge tone="brand">تعرفه شفاف؛ دسترسی کامل</Badge><h1>پلن مناسب مسیر کسب‌وکار شما</h1><p>امکانات پلن ماهانه و سالانه یکسان است؛ فقط مدت تعهد و هزینه متفاوت است. قیمت نهایی مستقیماً از سامانه محاسبه می‌شود.</p></header>
       {error && <StatePanel type="error" title="دریافت اطلاعات ناموفق بود" description={error} action={<Button onClick={load}>تلاش مجدد</Button>} />}

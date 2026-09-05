@@ -41,6 +41,7 @@ class MySubscriptionView(generics.GenericAPIView):
 
 
 class ActivateTrialView(generics.GenericAPIView):
+    throttle_scope = "trial"
     permission_classes = (permissions.IsAuthenticated,)
 
     @transaction.atomic
@@ -78,6 +79,7 @@ class ActivateTrialView(generics.GenericAPIView):
 
 
 class SubscriptionOrderViewSet(viewsets.ModelViewSet):
+    throttle_scope = "payment"
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = SubscriptionOrderSerializer
     http_method_names = ("get", "post", "head", "options")
